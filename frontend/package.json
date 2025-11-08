@@ -10,8 +10,10 @@
     "lint": "eslint .",
     "test": "jest",
     "test:coverage": "jest --coverage",
+  "test:e2e": "playwright test",
     "e2e:install": "npx playwright install --with-deps",
-    "e2e": "playwright test"
+  "setup": "node scripts/setup-wizard.cjs",
+  "check:env": "node scripts/check-env.cjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.0.2",

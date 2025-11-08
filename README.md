@@ -18,7 +18,9 @@ Bu repo şu an mimari iskeleti ve temel başlangıç kodlarını içerir.
    ```bash
    cd frontend
    npm install
-   cp .env.example .env.local # Supabase URL ve anon key gir
+   cp .env.example .env.local
+   # .env.local dosyasını düzenle (bkz: docs/ENVIRONMENT_SETUP.md)
+   npm run check:env  # Environment kontrolü
    npm run dev
    ```
 2. Supabase şemasını uygulama (lokal Supabase CLI veya dashboard):
