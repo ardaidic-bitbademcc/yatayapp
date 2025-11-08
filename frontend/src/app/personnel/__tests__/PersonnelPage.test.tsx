@@ -1,15 +1,12 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-jest.mock('@/lib/supabaseClient', () => ({
-  supabase: {
-    from: () => ({
-      select: async () => ({ data: [], error: null }),
-      update: async () => ({ error: null }),
-      insert: async () => ({ error: null }),
-      delete: async () => ({ error: null })
-    })
-  }
+jest.mock('../hooks', () => ({
+  usePersonnel: jest.fn(() => ({ data: [], isLoading: false, error: null })),
+  useCreatePersonnel: jest.fn(() => ({ mutateAsync: jest.fn(), isPending: false, error: null })),
+  useUpdatePersonnel: jest.fn(() => ({ mutateAsync: jest.fn(), isPending: false, error: null })),
+  useDeletePersonnel: jest.fn(() => ({ mutateAsync: jest.fn(), isPending: false, error: null }))
 }));
 
 jest.mock('next/link', () => ({
@@ -23,9 +20,17 @@ jest.mock('@/components/ui/button', () => ({
 
 import PersonnelPage from '../page';
 
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+});
+
+const Wrapper = ({ children }: any) => (
+  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+);
+
 describe('PersonnelPage', () => {
   it('başlık render ediyor', async () => {
-    render(<PersonnelPage />);
+    render(<PersonnelPage />, { wrapper: Wrapper });
     const heading = await screen.findByRole('heading', { name: 'Personel Yönetimi' });
     expect(heading).toBeInTheDocument();
   });

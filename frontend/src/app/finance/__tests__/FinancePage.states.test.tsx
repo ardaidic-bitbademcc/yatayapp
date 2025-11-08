@@ -1,12 +1,12 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-jest.mock('@/lib/supabaseClient', () => ({
-  supabase: {
-    from: () => ({
-      select: async () => ({ data: [], error: null })
-    })
-  }
+jest.mock('../hooks', () => ({
+  useIncomeRecords: jest.fn(() => ({ data: [], isLoading: false, error: null })),
+  useCreateIncomeRecord: jest.fn(() => ({ mutateAsync: jest.fn(), isPending: false, error: null })),
+  useUpdateIncomeRecord: jest.fn(() => ({ mutateAsync: jest.fn(), isPending: false, error: null })),
+  useDeleteIncomeRecord: jest.fn(() => ({ mutateAsync: jest.fn(), isPending: false, error: null }))
 }));
 
 jest.mock('next/link', () => ({
@@ -20,9 +20,17 @@ jest.mock('@/components/ui/button', () => ({
 
 import FinancePage from '../page';
 
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
+});
+
+const Wrapper = ({ children }: any) => (
+  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+);
+
 describe('FinancePage boş veri durumu', () => {
-  it('hiç kayıt yok mesajı render ediyor', async () => {
-    render(<FinancePage />);
+  it('hiç kayıt bulunamadı mesajı render ediyor', async () => {
+    render(<FinancePage />, { wrapper: Wrapper });
     expect(await screen.findByText(/Hiç kayıt yok/i)).toBeInTheDocument();
   });
 });
