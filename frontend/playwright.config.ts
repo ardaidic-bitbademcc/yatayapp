@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30_000,
   fullyParallel: true,
+  globalSetup: require.resolve('./tests/global-setup.ts'),
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
