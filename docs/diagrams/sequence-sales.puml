@@ -1,0 +1,74 @@
+@startuml
+actor Kasiyer
+participant "POS UI" as UI
+participant "Sales Service" as SalesService
+participant "Inventory Service" as InventoryService
+participant "Payment Service" as PaymentService
+participant "Supabase Client" as Supabase
+database "PostgreSQL" as DB
+participant "Real-time Server" as Realtime
+
+Kasiyer -> UI: Ürün ekle
+activate UI
+
+UI -> SalesService: addItemToCart(productId, quantity)
+activate SalesService
+
+SalesService -> Supabase: getBranchProduct(productId, branchId)
+activate Supabase
+Supabase -> DB: SELECT ... FROM branch_products
+DB --> Supabase: BranchProduct
+Supabase --> SalesService: BranchProduct
+deactivate Supabase
+
+SalesService -> InventoryService: checkStock(productId, quantity)
+activate InventoryService
+InventoryService --> SalesService: stockAvailable
+deactivate InventoryService
+
+SalesService --> UI: cartItem
+deactivate SalesService
+
+UI --> Kasiyer: Sepet güncellendi
+
+Kasiyer -> UI: Ödemeyi tamamla
+UI -> SalesService: completeSale(...)
+activate SalesService
+
+SalesService -> Supabase: createSale(saleData)
+activate Supabase
+Supabase -> DB: BEGIN; INSERT sales/items/payments; COMMIT
+Supabase --> SalesService: Sale
+deactivate Supabase
+
+SalesService -> InventoryService: updateStock(saleItems)
+activate InventoryService
+InventoryService -> Supabase: updateBranchProducts(stockUpdates)
+activate Supabase
+Supabase -> DB: UPDATE branch_products ...
+DB -> Realtime: Notify stock change
+Realtime -> UI: Stock updated event
+Supabase --> InventoryService: Success
+deactivate Supabase
+InventoryService --> SalesService: Success
+deactivate InventoryService
+
+SalesService -> PaymentService: recordPayment(...)
+activate PaymentService
+PaymentService -> Supabase: createPayment(...)
+Supabase --> PaymentService: Payment
+PaymentService --> SalesService: Success
+deactivate PaymentService
+
+SalesService -> Supabase: createIncomeRecord(...)
+activate Supabase
+Supabase -> DB: INSERT income_records
+Supabase --> SalesService: Success
+deactivate Supabase
+
+SalesService --> UI: Sale completed
+deactivate SalesService
+
+UI -> UI: generateInvoice(sale)
+UI --> Kasiyer: Fatura yazdırıldı
+@enduml

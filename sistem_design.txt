@@ -1,0 +1,2829 @@
+# Entegre POS Sistemi - Sistem Tasarım Dokümanı
+
+## 1. Genel Bakış
+
+Bu doküman, Emma tarafından hazırlanan PRD'ye dayanarak tasarlanan kapsamlı POS sisteminin teknik mimarisini detaylandırmaktadır. Sistem, Supabase backend altyapısı ve modern React/TypeScript frontend teknolojileri kullanılarak geliştirilecektir.
+
+### 1.1 Teknoloji Yığını
+
+- **Frontend**: Next.js 14 (App Router), TypeScript, Shadcn-ui, Tailwind CSS, React Query
+- **Backend**: Supabase (PostgreSQL, Authentication, Storage, Real-time, Edge Functions)
+- **State Management**: Zustand + React Query
+- **Form Yönetimi**: React Hook Form + Zod
+- **Grafik ve Raporlama**: Recharts, React-PDF
+- **AI/ML**: TensorFlow.js (client-side), Supabase Edge Functions (server-side AI)
+- **Offline Support**: IndexedDB + Service Workers
+- **Testing**: Playwright (E2E), Vitest (Unit)
+
+## 2. Uygulama Yaklaşımı
+
+### 2.1 Mimari Prensipler
+
+1. **Modüler Mimari**: Her modül (POS, Personel, Şube, Menü, Finans) bağımsız olarak geliştirilebilir ve test edilebilir
+2. **Real-time First**: Supabase real-time subscriptions kullanarak tüm kritik verilerde anlık senkronizasyon
+3. **Offline-First**: Progressive Web App (PWA) yaklaşımıyla offline çalışma kapasitesi
+4. **Security by Design**: Row Level Security (RLS) ve rol tabanlı erişim kontrolü her katmanda
+5. **Scalability**: Horizontal ölçeklenebilir mimari, connection pooling, caching stratejileri
+6. **Type Safety**: End-to-end TypeScript kullanımı, Supabase generated types
+
+### 2.2 Kritik Gereksinimler ve Çözümler
+
+**1. Personel Maaş → Finans Gider Entegrasyonu**
+- PostgreSQL trigger'ları ile otomatik gider kaydı oluşturma
+- Maaş hesaplama edge function'ı (aylık/haftalık çalışma)
+- Real-time notification sistemi
+
+**2. Çoklu Şube Senkronizasyonu**
+- Merkezi ürün kataloğu + şube-spesifik override'lar
+- Broadcast channel pattern ile tüm şubelere anında güncelleme
+- Conflict resolution stratejisi (last-write-wins + audit log)
+
+**3. Menü Mühendisliği AI**
+- Client-side TensorFlow.js modeli (hızlı tahminler)
+- Edge Function ile ağır hesaplamalar (maliyet analizi, optimizasyon)
+- Batch processing ile geçmiş veri analizi
+
+**4. Offline POS İşlemleri**
+- IndexedDB'de local transaction queue
+- Service Worker ile background sync
+- Conflict detection ve resolution UI
+
+## 3. Kullanıcı ve UI Etkileşim Kalıpları
+
+### 3.1 Ana Kullanıcı Senaryoları
+
+**1. Kasiyer - Hızlı Satış İşlemi**
+- Ürün arama/barkod okutma → Sepete ekleme → Ödeme → Fatura yazdırma
+- Ortalama süre: 30-60 saniye
+- Offline çalışabilir, sonra senkronize olur
+
+**2. Müdür - Günlük Rapor İnceleme**
+- Dashboard açma → Günlük satış/gider görüntüleme → Şube karşılaştırması
+- Real-time güncellemeler
+- Export to PDF/Excel
+
+**3. İşletme Sahibi - Çoklu Şube Yönetimi**
+- Merkezi panel → Şube seçimi → Ürün/fiyat toplu güncelleme → Onaylama
+- Tüm şubelere anında yayılma
+- Audit log takibi
+
+**4. Aşçıbaşı - Menü Optimizasyonu**
+- Menü listesi → AI analiz başlatma → Öneriler görüntüleme → Uygulama
+- Maliyet-kar analizi
+- Reçete yönetimi
+
+**5. Personel - Vardiya Giriş/Çıkış**
+- QR kod okutma/PIN girişi → Otomatik saat kaydı → Onay
+- Günlük/haftalık çalışma saati görüntüleme
+- İzin talep etme
+
+### 3.2 UI Navigasyon Akışı
+
+```
+Ana Dashboard
+├── POS Modülü
+│   ├── Satış Ekranı (Hızlı Erişim)
+│   ├── Ürün Yönetimi
+│   ├── Stok Takibi
+│   └── Fatura Geçmişi
+├── Personel Modülü
+│   ├── Vardiya Yönetimi
+│   ├── Puantaj Takibi
+│   ├── Maaş Hesaplama
+│   └── İzin Yönetimi
+├── Şube Modülü
+│   ├── Şube Listesi
+│   ├── Merkezi Ürün Yönetimi
+│   ├── Şubeler Arası Transfer
+│   └── Performans Karşılaştırması
+├── Menü Modülü
+│   ├── Menü Listesi
+│   ├── Reçete Yönetimi
+│   ├── Maliyet Analizi
+│   └── AI Menü Mühendisi
+└── Finans Modülü
+    ├── Gelir-Gider Takibi
+    ├── Kar-Zarar Raporu
+    ├── Tahmin ve Analiz
+    └── Bütçe Planlama
+```
+
+## 4. Sistem Mimarisi
+
+### 4.1 Üst Düzey Mimari (PlantUML)
+
+```plantuml
+@startuml
+!define RECTANGLE class
+
+package "Frontend Layer" {
+    [Next.js App] as NextApp
+    [React Components] as Components
+    [Shadcn UI] as ShadcnUI
+    [State Management\n(Zustand)] as State
+    [React Query\n(Cache)] as ReactQuery
+    [Service Workers\n(Offline)] as SW
+}
+
+package "API Layer" {
+    [Supabase Client] as SupabaseClient
+    [Real-time\nSubscriptions] as Realtime
+    [Auth Service] as AuthService
+    [Storage Service] as StorageService
+}
+
+package "Backend Layer (Supabase)" {
+    database "PostgreSQL\nDatabase" as DB {
+        [Tables]
+        [Views]
+        [Functions]
+        [Triggers]
+    }
+    [Row Level\nSecurity (RLS)] as RLS
+    [Edge Functions] as EdgeFunctions
+    [Real-time Server] as RealtimeServer
+    [Auth Server] as AuthServer
+    [Storage Buckets] as Storage
+}
+
+package "External Services" {
+    [AI/ML Models\n(TensorFlow.js)] as AI
+    [Payment Gateway\n(iyzico/PayTR)] as Payment
+    [E-Invoice\nIntegration] as EInvoice
+}
+
+package "Client Storage" {
+    [IndexedDB\n(Offline Queue)] as IndexedDB
+    [Local Storage\n(Settings)] as LocalStorage
+}
+
+NextApp --> Components
+Components --> ShadcnUI
+Components --> State
+Components --> ReactQuery
+NextApp --> SW
+
+ReactQuery --> SupabaseClient
+State --> SupabaseClient
+SupabaseClient --> Realtime
+SupabaseClient --> AuthService
+SupabaseClient --> StorageService
+
+Realtime --> RealtimeServer
+AuthService --> AuthServer
+StorageService --> Storage
+
+SupabaseClient --> DB
+DB --> RLS
+DB --> EdgeFunctions
+
+Components --> AI
+SupabaseClient --> Payment
+SupabaseClient --> EInvoice
+
+SW --> IndexedDB
+State --> LocalStorage
+
+RealtimeServer --> DB
+EdgeFunctions --> DB
+@enduml
+```
+
+### 4.2 Modül Mimarisi
+
+Sistem 5 ana modülden oluşur, her modül kendi domain logic'ine sahiptir ancak paylaşılan servisler üzerinden entegre çalışır.
+
+```plantuml
+@startuml
+package "POS Module" {
+    [Sales Screen] as Sales
+    [Product Management] as Products
+    [Inventory Sync] as Inventory
+    [Invoice Generator] as Invoice
+}
+
+package "Personnel Module" {
+    [Shift Management] as Shifts
+    [Time Tracking] as TimeTrack
+    [Salary Calculator] as Salary
+    [Leave Management] as Leave
+}
+
+package "Branch Module" {
+    [Branch List] as Branches
+    [Central Product Mgmt] as CentralProducts
+    [Inter-branch Transfer] as Transfer
+    [Performance Compare] as Performance
+}
+
+package "Menu Module" {
+    [Menu List] as MenuList
+    [Recipe Management] as Recipes
+    [Cost Analysis] as CostAnalysis
+    [AI Menu Engineer] as AIMenu
+}
+
+package "Finance Module" {
+    [Income/Expense Track] as IncomeExpense
+    [P&L Report] as PL
+    [Forecasting] as Forecast
+    [Budget Planning] as Budget
+}
+
+package "Shared Services" {
+    [Auth Service] as Auth
+    [Notification Service] as Notify
+    [Report Service] as Report
+    [Sync Service] as Sync
+    [Cache Service] as Cache
+}
+
+package "Data Layer" {
+    database "Supabase PostgreSQL" as DB
+    [Real-time Subscriptions] as RT
+}
+
+Sales --> Inventory
+Sales --> Invoice
+Invoice --> IncomeExpense
+
+Shifts --> TimeTrack
+TimeTrack --> Salary
+Salary --> IncomeExpense
+
+CentralProducts --> Branches
+Transfer --> Inventory
+
+Recipes --> CostAnalysis
+CostAnalysis --> AIMenu
+AIMenu --> MenuList
+
+IncomeExpense --> PL
+PL --> Forecast
+Forecast --> Budget
+
+Sales --> Auth
+Shifts --> Auth
+Branches --> Auth
+MenuList --> Auth
+IncomeExpense --> Auth
+
+Salary --> Notify
+Transfer --> Notify
+AIMenu --> Notify
+
+PL --> Report
+Performance --> Report
+
+Branches --> Sync
+Inventory --> Sync
+
+Sales --> Cache
+Products --> Cache
+
+Auth --> DB
+Notify --> DB
+Report --> DB
+Sync --> RT
+Cache --> DB
+
+@enduml
+```
+
+## 5. Veri Yapıları ve Arayüzler
+
+### 5.1 Veritabanı Şeması (Class Diagram)
+
+```plantuml
+@startuml
+!define TABLE class
+!define PK <<PK>>
+!define FK <<FK>>
+!define UK <<UK>>
+
+' Core Entities
+TABLE organizations {
+    +id: uuid PK
+    --
+    name: varchar(255)
+    tax_number: varchar(20) UK
+    address: text
+    phone: varchar(20)
+    email: varchar(255)
+    logo_url: varchar(500)
+    created_at: timestamp
+    updated_at: timestamp
+}
+
+TABLE branches {
+    +id: uuid PK
+    --
+    organization_id: uuid FK
+    name: varchar(255)
+    code: varchar(50) UK
+    address: text
+    phone: varchar(20)
+    manager_id: uuid FK
+    is_active: boolean
+    created_at: timestamp
+    updated_at: timestamp
+}
+
+TABLE users {
+    +id: uuid PK
+    --
+    email: varchar(255) UK
+    full_name: varchar(255)
+    phone: varchar(20)
+    role: enum('owner','manager','cashier','chef','staff')
+    branch_id: uuid FK
+    organization_id: uuid FK
+    avatar_url: varchar(500)
+    is_active: boolean
+    created_at: timestamp
+    updated_at: timestamp
+}
+
+' Product & Inventory
+TABLE categories {
+    +id: uuid PK
+    --
+    organization_id: uuid FK
+    name: varchar(255)
+    description: text
+    parent_id: uuid FK
+    sort_order: integer
+    is_active: boolean
+    created_at: timestamp
+}
+
+TABLE products {
+    +id: uuid PK
+    --
+    organization_id: uuid FK
+    category_id: uuid FK
+    sku: varchar(100) UK
+    name: varchar(255)
+    description: text
+    base_price: decimal(10,2)
+    cost_price: decimal(10,2)
+    tax_rate: decimal(5,2)
+    unit: varchar(50)
+    image_url: varchar(500)
+    is_active: boolean
+    created_at: timestamp
+    updated_at: timestamp
+}
+
+TABLE branch_products {
+    +id: uuid PK
+    --
+    branch_id: uuid FK
+    product_id: uuid FK
+    price_override: decimal(10,2)
+    stock_quantity: decimal(10,2)
+    min_stock_level: decimal(10,2)
+    is_available: boolean
+    last_stock_update: timestamp
+    created_at: timestamp
+    updated_at: timestamp
+}
+
+' Sales & Transactions
+TABLE sales {
+    +id: uuid PK
+    --
+    branch_id: uuid FK
+    cashier_id: uuid FK
+    sale_number: varchar(50) UK
+    sale_date: timestamp
+    subtotal: decimal(10,2)
+    tax_amount: decimal(10,2)
+    discount_amount: decimal(10,2)
+    total_amount: decimal(10,2)
+    payment_method: enum('cash','card','mobile','mixed')
+    payment_status: enum('pending','completed','refunded')
+    notes: text
+    created_at: timestamp
+    updated_at: timestamp
+}
+
+TABLE sale_items {
+    +id: uuid PK
+    --
+    sale_id: uuid FK
+    product_id: uuid FK
+    quantity: decimal(10,2)
+    unit_price: decimal(10,2)
+    tax_rate: decimal(5,2)
+    discount_amount: decimal(10,2)
+    subtotal: decimal(10,2)
+    notes: text
+}
+
+TABLE payments {
+    +id: uuid PK
+    --
+    sale_id: uuid FK
+    payment_method: varchar(50)
+    amount: decimal(10,2)
+    transaction_id: varchar(255)
+    payment_date: timestamp
+    status: enum('pending','completed','failed','refunded')
+    created_at: timestamp
+}
+
+' Personnel Management
+TABLE shifts {
+    +id: uuid PK
+    --
+    branch_id: uuid FK
+    name: varchar(100)
+    start_time: time
+    end_time: time
+    days_of_week: integer[]
+    is_active: boolean
+    created_at: timestamp
+}
+
+TABLE shift_assignments {
+    +id: uuid PK
+    --
+    user_id: uuid FK
+    shift_id: uuid FK
+    date: date
+    status: enum('scheduled','completed','absent','on_leave')
+    created_at: timestamp
+}
+
+TABLE time_entries {
+    +id: uuid PK
+    --
+    user_id: uuid FK
+    branch_id: uuid FK
+    shift_assignment_id: uuid FK
+    clock_in: timestamp
+    clock_out: timestamp
+    break_duration: integer
+    total_hours: decimal(5,2)
+    overtime_hours: decimal(5,2)
+    notes: text
+    created_at: timestamp
+}
+
+TABLE salary_calculations {
+    +id: uuid PK
+    --
+    user_id: uuid FK
+    period_start: date
+    period_end: date
+    base_salary: decimal(10,2)
+    overtime_pay: decimal(10,2)
+    bonuses: decimal(10,2)
+    deductions: decimal(10,2)
+    net_salary: decimal(10,2)
+    status: enum('draft','approved','paid')
+    approved_by: uuid FK
+    approved_at: timestamp
+    paid_at: timestamp
+    created_at: timestamp
+}
+
+TABLE leave_requests {
+    +id: uuid PK
+    --
+    user_id: uuid FK
+    leave_type: enum('annual','sick','unpaid','maternity')
+    start_date: date
+    end_date: date
+    days_count: integer
+    reason: text
+    status: enum('pending','approved','rejected')
+    approved_by: uuid FK
+    approved_at: timestamp
+    created_at: timestamp
+}
+
+' Menu Management
+TABLE menu_items {
+    +id: uuid PK
+    --
+    organization_id: uuid FK
+    name: varchar(255)
+    description: text
+    category: varchar(100)
+    selling_price: decimal(10,2)
+    target_cost_percentage: decimal(5,2)
+    is_active: boolean
+    image_url: varchar(500)
+    created_at: timestamp
+    updated_at: timestamp
+}
+
+TABLE recipes {
+    +id: uuid PK
+    --
+    menu_item_id: uuid FK
+    product_id: uuid FK
+    quantity: decimal(10,3)
+    unit: varchar(50)
+    notes: text
+}
+
+TABLE menu_engineering_analysis {
+    +id: uuid PK
+    --
+    menu_item_id: uuid FK
+    branch_id: uuid FK
+    analysis_date: date
+    total_sales: integer
+    revenue: decimal(10,2)
+    cost: decimal(10,2)
+    profit: decimal(10,2)
+    profit_margin: decimal(5,2)
+    popularity_score: decimal(5,2)
+    category: enum('star','puzzle','plow_horse','dog')
+    ai_recommendation: text
+    created_at: timestamp
+}
+
+' Finance Management
+TABLE expense_categories {
+    +id: uuid PK
+    --
+    organization_id: uuid FK
+    name: varchar(255)
+    description: text
+    is_system: boolean
+    parent_id: uuid FK
+    created_at: timestamp
+}
+
+TABLE expenses {
+    +id: uuid PK
+    --
+    branch_id: uuid FK
+    category_id: uuid FK
+    amount: decimal(10,2)
+    expense_date: date
+    description: text
+    receipt_url: varchar(500)
+    payment_method: varchar(50)
+    is_recurring: boolean
+    source_type: enum('manual','salary','inventory','other')
+    source_id: uuid
+    created_by: uuid FK
+    created_at: timestamp
+}
+
+TABLE income_records {
+    +id: uuid PK
+    --
+    branch_id: uuid FK
+    sale_id: uuid FK
+    amount: decimal(10,2)
+    income_date: date
+    description: text
+    created_at: timestamp
+}
+
+TABLE financial_reports {
+    +id: uuid PK
+    --
+    branch_id: uuid FK
+    report_type: enum('daily','weekly','monthly','yearly')
+    period_start: date
+    period_end: date
+    total_income: decimal(10,2)
+    total_expenses: decimal(10,2)
+    gross_profit: decimal(10,2)
+    net_profit: decimal(10,2)
+    profit_margin: decimal(5,2)
+    report_data: jsonb
+    generated_at: timestamp
+}
+
+' Relationships
+organizations ||--o{ branches
+organizations ||--o{ users
+organizations ||--o{ categories
+organizations ||--o{ products
+organizations ||--o{ menu_items
+organizations ||--o{ expense_categories
+
+branches ||--o{ users
+branches ||--o{ branch_products
+branches ||--o{ sales
+branches ||--o{ shifts
+branches ||--o{ time_entries
+branches ||--o{ menu_engineering_analysis
+branches ||--o{ expenses
+branches ||--o{ income_records
+branches ||--o{ financial_reports
+
+users ||--o{ sales
+users ||--o{ shift_assignments
+users ||--o{ time_entries
+users ||--o{ salary_calculations
+users ||--o{ leave_requests
+users ||--o{ expenses
+
+categories ||--o{ products
+categories ||--o{ categories
+
+products ||--o{ branch_products
+products ||--o{ sale_items
+products ||--o{ recipes
+
+sales ||--o{ sale_items
+sales ||--o{ payments
+sales ||--o{ income_records
+
+shifts ||--o{ shift_assignments
+shift_assignments ||--o{ time_entries
+
+menu_items ||--o{ recipes
+menu_items ||--o{ menu_engineering_analysis
+
+expense_categories ||--o{ expenses
+expense_categories ||--o{ expense_categories
+
+@enduml
+```
+
+### 5.2 TypeScript Arayüz Tanımları
+
+```typescript
+// Core Types
+export interface Organization {
+  id: string;
+  name: string;
+  tax_number: string;
+  address: string;
+  phone: string;
+  email: string;
+  logo_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Branch {
+  id: string;
+  organization_id: string;
+  name: string;
+  code: string;
+  address: string;
+  phone: string;
+  manager_id: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type UserRole = 'owner' | 'manager' | 'cashier' | 'chef' | 'staff';
+
+export interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  phone: string;
+  role: UserRole;
+  branch_id: string;
+  organization_id: string;
+  avatar_url?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Product Types
+export interface Product {
+  id: string;
+  organization_id: string;
+  category_id: string;
+  sku: string;
+  name: string;
+  description?: string;
+  base_price: number;
+  cost_price: number;
+  tax_rate: number;
+  unit: string;
+  image_url?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BranchProduct {
+  id: string;
+  branch_id: string;
+  product_id: string;
+  price_override?: number;
+  stock_quantity: number;
+  min_stock_level: number;
+  is_available: boolean;
+  last_stock_update: string;
+  created_at: string;
+  updated_at: string;
+  product?: Product;
+}
+
+// Sales Types
+export type PaymentMethod = 'cash' | 'card' | 'mobile' | 'mixed';
+export type PaymentStatus = 'pending' | 'completed' | 'refunded';
+
+export interface Sale {
+  id: string;
+  branch_id: string;
+  cashier_id: string;
+  sale_number: string;
+  sale_date: string;
+  subtotal: number;
+  tax_amount: number;
+  discount_amount: number;
+  total_amount: number;
+  payment_method: PaymentMethod;
+  payment_status: PaymentStatus;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  items?: SaleItem[];
+  payments?: Payment[];
+}
+
+export interface SaleItem {
+  id: string;
+  sale_id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  tax_rate: number;
+  discount_amount: number;
+  subtotal: number;
+  notes?: string;
+  product?: Product;
+}
+
+export interface Payment {
+  id: string;
+  sale_id: string;
+  payment_method: string;
+  amount: number;
+  transaction_id?: string;
+  payment_date: string;
+  status: PaymentStatus;
+  created_at: string;
+}
+
+// Personnel Types
+export interface Shift {
+  id: string;
+  branch_id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  days_of_week: number[];
+  is_active: boolean;
+  created_at: string;
+}
+
+export type ShiftStatus = 'scheduled' | 'completed' | 'absent' | 'on_leave';
+
+export interface ShiftAssignment {
+  id: string;
+  user_id: string;
+  shift_id: string;
+  date: string;
+  status: ShiftStatus;
+  created_at: string;
+  shift?: Shift;
+  user?: User;
+}
+
+export interface TimeEntry {
+  id: string;
+  user_id: string;
+  branch_id: string;
+  shift_assignment_id?: string;
+  clock_in: string;
+  clock_out?: string;
+  break_duration: number;
+  total_hours: number;
+  overtime_hours: number;
+  notes?: string;
+  created_at: string;
+}
+
+export type SalaryStatus = 'draft' | 'approved' | 'paid';
+
+export interface SalaryCalculation {
+  id: string;
+  user_id: string;
+  period_start: string;
+  period_end: string;
+  base_salary: number;
+  overtime_pay: number;
+  bonuses: number;
+  deductions: number;
+  net_salary: number;
+  status: SalaryStatus;
+  approved_by?: string;
+  approved_at?: string;
+  paid_at?: string;
+  created_at: string;
+}
+
+export type LeaveType = 'annual' | 'sick' | 'unpaid' | 'maternity';
+export type LeaveStatus = 'pending' | 'approved' | 'rejected';
+
+export interface LeaveRequest {
+  id: string;
+  user_id: string;
+  leave_type: LeaveType;
+  start_date: string;
+  end_date: string;
+  days_count: number;
+  reason?: string;
+  status: LeaveStatus;
+  approved_by?: string;
+  approved_at?: string;
+  created_at: string;
+}
+
+// Menu Types
+export interface MenuItem {
+  id: string;
+  organization_id: string;
+  name: string;
+  description?: string;
+  category: string;
+  selling_price: number;
+  target_cost_percentage: number;
+  is_active: boolean;
+  image_url?: string;
+  created_at: string;
+  updated_at: string;
+  recipes?: Recipe[];
+}
+
+export interface Recipe {
+  id: string;
+  menu_item_id: string;
+  product_id: string;
+  quantity: number;
+  unit: string;
+  notes?: string;
+  product?: Product;
+}
+
+export type MenuCategory = 'star' | 'puzzle' | 'plow_horse' | 'dog';
+
+export interface MenuEngineeringAnalysis {
+  id: string;
+  menu_item_id: string;
+  branch_id: string;
+  analysis_date: string;
+  total_sales: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+  profit_margin: number;
+  popularity_score: number;
+  category: MenuCategory;
+  ai_recommendation?: string;
+  created_at: string;
+  menu_item?: MenuItem;
+}
+
+// Finance Types
+export interface ExpenseCategory {
+  id: string;
+  organization_id: string;
+  name: string;
+  description?: string;
+  is_system: boolean;
+  parent_id?: string;
+  created_at: string;
+}
+
+export type ExpenseSource = 'manual' | 'salary' | 'inventory' | 'other';
+
+export interface Expense {
+  id: string;
+  branch_id: string;
+  category_id: string;
+  amount: number;
+  expense_date: string;
+  description?: string;
+  receipt_url?: string;
+  payment_method: string;
+  is_recurring: boolean;
+  source_type: ExpenseSource;
+  source_id?: string;
+  created_by: string;
+  created_at: string;
+  category?: ExpenseCategory;
+}
+
+export interface IncomeRecord {
+  id: string;
+  branch_id: string;
+  sale_id?: string;
+  amount: number;
+  income_date: string;
+  description?: string;
+  created_at: string;
+}
+
+export type ReportType = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface FinancialReport {
+  id: string;
+  branch_id: string;
+  report_type: ReportType;
+  period_start: string;
+  period_end: string;
+  total_income: number;
+  total_expenses: number;
+  gross_profit: number;
+  net_profit: number;
+  profit_margin: number;
+  report_data: Record<string, any>;
+  generated_at: string;
+}
+
+// API Response Types
+export interface ApiResponse<T> {
+  data?: T;
+  error?: {
+    message: string;
+    code: string;
+    details?: any;
+  };
+  count?: number;
+}
+
+export interface PaginationParams {
+  page: number;
+  limit: number;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    total_pages: number;
+  };
+}
+
+// Real-time Subscription Types
+export interface RealtimePayload<T> {
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  new: T;
+  old: T;
+  table: string;
+}
+
+// Offline Queue Types
+export interface OfflineTransaction {
+  id: string;
+  type: 'sale' | 'expense' | 'time_entry';
+  data: any;
+  timestamp: string;
+  status: 'pending' | 'synced' | 'failed';
+  retry_count: number;
+}
+```
+
+## 6. Program Çağrı Akışı
+
+### 6.1 Satış İşlemi Sequence Diagram
+
+```plantuml
+@startuml
+actor Kasiyer
+participant "POS UI" as UI
+participant "Sales Service" as SalesService
+participant "Inventory Service" as InventoryService
+participant "Payment Service" as PaymentService
+participant "Supabase Client" as Supabase
+database "PostgreSQL" as DB
+participant "Real-time Server" as Realtime
+
+Kasiyer -> UI: Ürün ekle
+activate UI
+
+UI -> SalesService: addItemToCart(productId, quantity)
+activate SalesService
+    note right
+        Input: {
+            "product_id": "uuid",
+            "quantity": number,
+            "branch_id": "uuid"
+        }
+    end note
+
+SalesService -> Supabase: getBranchProduct(productId, branchId)
+activate Supabase
+Supabase -> DB: SELECT * FROM branch_products\nWHERE product_id = ? AND branch_id = ?
+DB --> Supabase: BranchProduct
+Supabase --> SalesService: BranchProduct
+deactivate Supabase
+    note right
+        Output: {
+            "id": "uuid",
+            "product_id": "uuid",
+            "price_override": number,
+            "stock_quantity": number,
+            "is_available": boolean
+        }
+    end note
+
+SalesService -> InventoryService: checkStock(productId, quantity)
+activate InventoryService
+InventoryService --> SalesService: stockAvailable: boolean
+deactivate InventoryService
+
+SalesService --> UI: cartItem: CartItem
+deactivate SalesService
+
+UI --> Kasiyer: Sepet güncellendi
+
+Kasiyer -> UI: Ödemeyi tamamla
+UI -> SalesService: completeSale(cartItems, paymentMethod)
+activate SalesService
+    note right
+        Input: {
+            "cart_items": [{
+                "product_id": "uuid",
+                "quantity": number,
+                "unit_price": number
+            }],
+            "payment_method": "cash|card|mobile",
+            "branch_id": "uuid",
+            "cashier_id": "uuid"
+        }
+    end note
+
+SalesService -> SalesService: calculateTotals()
+
+SalesService -> Supabase: createSale(saleData)
+activate Supabase
+Supabase -> DB: BEGIN TRANSACTION
+Supabase -> DB: INSERT INTO sales (...)
+DB --> Supabase: sale_id
+Supabase -> DB: INSERT INTO sale_items (...)
+Supabase -> DB: INSERT INTO payments (...)
+Supabase -> DB: COMMIT
+Supabase --> SalesService: Sale
+deactivate Supabase
+    note right
+        Output: {
+            "id": "uuid",
+            "sale_number": "string",
+            "total_amount": number,
+            "payment_status": "completed",
+            "created_at": "timestamp"
+        }
+    end note
+
+SalesService -> InventoryService: updateStock(saleItems)
+activate InventoryService
+InventoryService -> Supabase: updateBranchProducts(stockUpdates)
+activate Supabase
+Supabase -> DB: UPDATE branch_products\nSET stock_quantity = stock_quantity - ?\nWHERE product_id = ? AND branch_id = ?
+DB -> Realtime: Notify stock change
+Realtime -> UI: Stock updated event
+Supabase --> InventoryService: Success
+deactivate Supabase
+InventoryService --> SalesService: Success
+deactivate InventoryService
+
+SalesService -> PaymentService: recordPayment(saleId, paymentData)
+activate PaymentService
+PaymentService -> Supabase: createPayment(paymentData)
+Supabase --> PaymentService: Payment
+PaymentService --> SalesService: Success
+deactivate PaymentService
+
+SalesService -> Supabase: createIncomeRecord(saleId, amount)
+activate Supabase
+Supabase -> DB: INSERT INTO income_records (...)
+Supabase --> SalesService: Success
+deactivate Supabase
+
+SalesService --> UI: Sale completed
+deactivate SalesService
+
+UI -> UI: generateInvoice(sale)
+UI --> Kasiyer: Fatura yazdırıldı
+
+@enduml
+```
+
+### 6.2 Maaş Hesaplama ve Gider Entegrasyonu
+
+```plantuml
+@startuml
+actor "HR Manager" as HR
+participant "Personnel UI" as UI
+participant "Salary Service" as SalaryService
+participant "Time Service" as TimeService
+participant "Finance Service" as FinanceService
+participant "Supabase Client" as Supabase
+database "PostgreSQL" as DB
+participant "Edge Function\n(Calculate Salary)" as EdgeFunc
+
+HR -> UI: Maaş hesapla (dönem seç)
+activate UI
+
+UI -> SalaryService: calculateSalaryForPeriod(userId, startDate, endDate)
+activate SalaryService
+    note right
+        Input: {
+            "user_id": "uuid",
+            "period_start": "date",
+            "period_end": "date"
+        }
+    end note
+
+SalaryService -> TimeService: getTotalHours(userId, startDate, endDate)
+activate TimeService
+TimeService -> Supabase: getTimeEntries(userId, dateRange)
+activate Supabase
+Supabase -> DB: SELECT * FROM time_entries\nWHERE user_id = ? AND clock_in BETWEEN ? AND ?
+DB --> Supabase: TimeEntry[]
+Supabase --> TimeService: TimeEntry[]
+deactivate Supabase
+TimeService -> TimeService: calculateTotalHours()
+TimeService -> TimeService: calculateOvertimeHours()
+TimeService --> SalaryService: HoursData
+deactivate TimeService
+    note right
+        Output: {
+            "total_hours": number,
+            "overtime_hours": number,
+            "regular_hours": number
+        }
+    end note
+
+SalaryService -> Supabase: getUserSalaryInfo(userId)
+activate Supabase
+Supabase -> DB: SELECT * FROM users WHERE id = ?
+DB --> Supabase: User (with base_salary)
+Supabase --> SalaryService: User
+deactivate Supabase
+
+SalaryService -> EdgeFunc: POST /calculate-salary
+activate EdgeFunc
+    note right
+        Input: {
+            "base_salary": number,
+            "total_hours": number,
+            "overtime_hours": number,
+            "bonuses": number,
+            "deductions": number
+        }
+    end note
+EdgeFunc -> EdgeFunc: Calculate net salary\n(base + overtime + bonuses - deductions)
+EdgeFunc --> SalaryService: SalaryCalculation
+deactivate EdgeFunc
+    note right
+        Output: {
+            "base_salary": number,
+            "overtime_pay": number,
+            "bonuses": number,
+            "deductions": number,
+            "net_salary": number,
+            "breakdown": {...}
+        }
+    end note
+
+SalaryService -> Supabase: createSalaryCalculation(salaryData)
+activate Supabase
+Supabase -> DB: INSERT INTO salary_calculations (...)\nRETURNING *
+DB --> Supabase: SalaryCalculation (id, net_salary)
+Supabase --> SalaryService: SalaryCalculation
+deactivate Supabase
+
+SalaryService --> UI: Salary calculation created
+deactivate SalaryService
+
+UI --> HR: Maaş hesaplandı, onay bekliyor
+
+HR -> UI: Maaşı onayla
+UI -> SalaryService: approveSalary(salaryId)
+activate SalaryService
+
+SalaryService -> Supabase: updateSalaryStatus(salaryId, 'approved')
+activate Supabase
+Supabase -> DB: UPDATE salary_calculations\nSET status = 'approved', approved_by = ?, approved_at = NOW()\nWHERE id = ?
+DB -> DB: TRIGGER: after_salary_approved
+    note right
+        Trigger automatically creates expense record
+    end note
+DB -> DB: INSERT INTO expenses (\n  branch_id,\n  category_id, -- 'Personel Maaşları'\n  amount,\n  expense_date,\n  source_type = 'salary',\n  source_id = salary_calculation_id\n)
+DB --> Supabase: Success
+Supabase --> SalaryService: Success
+deactivate Supabase
+
+SalaryService -> FinanceService: notifyExpenseCreated(expenseId)
+activate FinanceService
+FinanceService -> Supabase: subscribeToExpenseChanges()
+FinanceService --> SalaryService: Notification sent
+deactivate FinanceService
+
+SalaryService --> UI: Salary approved, expense recorded
+deactivate SalaryService
+
+UI --> HR: Maaş onaylandı ve gider olarak kaydedildi
+
+@enduml
+```
+
+### 6.3 Çoklu Şube Ürün Güncelleme
+
+```plantuml
+@startuml
+actor "Central Manager" as Manager
+participant "Branch Mgmt UI" as UI
+participant "Branch Service" as BranchService
+participant "Product Service" as ProductService
+participant "Supabase Client" as Supabase
+database "PostgreSQL" as DB
+participant "Real-time Server" as Realtime
+participant "Branch 1 UI" as Branch1
+participant "Branch 2 UI" as Branch2
+participant "Branch N UI" as BranchN
+
+Manager -> UI: Toplu ürün güncelleme
+activate UI
+
+UI -> BranchService: getBranches(organizationId)
+activate BranchService
+BranchService -> Supabase: getBranches()
+Supabase --> BranchService: Branch[]
+BranchService --> UI: Branch[]
+deactivate BranchService
+
+UI --> Manager: Şube listesi göster
+
+Manager -> UI: Şubeler seç + ürün güncelleme bilgisi gir
+    note right
+        Input: {
+            "branch_ids": ["uuid1", "uuid2", ...],
+            "updates": [{
+                "product_id": "uuid",
+                "action": "add|update|remove",
+                "price_override": number,
+                "stock_quantity": number
+            }]
+        }
+    end note
+
+UI -> ProductService: bulkUpdateBranchProducts(branchIds, updates)
+activate ProductService
+
+ProductService -> Supabase: rpc('bulk_update_branch_products', params)
+activate Supabase
+Supabase -> DB: BEGIN TRANSACTION
+loop For each branch
+    loop For each update
+        alt Action = 'add'
+            DB -> DB: INSERT INTO branch_products\n(branch_id, product_id, price_override, stock_quantity)\nON CONFLICT (branch_id, product_id) DO UPDATE
+        else Action = 'update'
+            DB -> DB: UPDATE branch_products\nSET price_override = ?, stock_quantity = ?\nWHERE branch_id = ? AND product_id = ?
+        else Action = 'remove'
+            DB -> DB: UPDATE branch_products\nSET is_available = false\nWHERE branch_id = ? AND product_id = ?
+        end
+    end
+end
+DB -> DB: COMMIT
+
+DB -> Realtime: Broadcast product changes
+Realtime -> Branch1: Product update event
+Realtime -> Branch2: Product update event
+Realtime -> BranchN: Product update event
+
+Supabase --> ProductService: Success
+deactivate Supabase
+    note right
+        Output: {
+            "updated_count": number,
+            "failed_count": number,
+            "details": [...]
+        }
+    end note
+
+ProductService --> UI: Bulk update completed
+deactivate ProductService
+
+UI --> Manager: Güncelleme tamamlandı
+
+Branch1 -> Branch1: Refresh product list
+Branch2 -> Branch2: Refresh product list
+BranchN -> BranchN: Refresh product list
+
+@enduml
+```
+
+### 6.4 AI Menü Mühendisliği Analizi
+
+```plantuml
+@startuml
+actor Chef
+participant "Menu UI" as UI
+participant "Menu Service" as MenuService
+participant "AI Service" as AIService
+participant "Supabase Client" as Supabase
+database "PostgreSQL" as DB
+participant "Edge Function\n(AI Analysis)" as EdgeFunc
+
+Chef -> UI: AI analiz başlat
+activate UI
+
+UI -> MenuService: startMenuAnalysis(branchId, dateRange)
+activate MenuService
+    note right
+        Input: {
+            "branch_id": "uuid",
+            "start_date": "date",
+            "end_date": "date"
+        }
+    end note
+
+MenuService -> Supabase: getMenuItemsWithSales(branchId, dateRange)
+activate Supabase
+Supabase -> DB: SELECT mi.*, \n  COUNT(si.id) as total_sales,\n  SUM(si.subtotal) as revenue,\n  SUM(r.quantity * p.cost_price) as cost\nFROM menu_items mi\nJOIN recipes r ON r.menu_item_id = mi.id\nJOIN products p ON p.id = r.product_id\nLEFT JOIN sale_items si ON si.product_id = mi.id\nWHERE mi.branch_id = ? AND si.created_at BETWEEN ? AND ?\nGROUP BY mi.id
+DB --> Supabase: MenuItemWithSales[]
+Supabase --> MenuService: MenuItemWithSales[]
+deactivate Supabase
+    note right
+        Output: [{
+            "menu_item_id": "uuid",
+            "name": "string",
+            "total_sales": number,
+            "revenue": number,
+            "cost": number,
+            "selling_price": number
+        }]
+    end note
+
+MenuService -> AIService: analyzeMenuPerformance(menuData)
+activate AIService
+
+AIService -> AIService: calculatePopularityScore()
+AIService -> AIService: calculateProfitMargin()
+AIService -> AIService: categorizeMenuItem()\n(Star/Puzzle/PlowHorse/Dog)
+
+AIService -> EdgeFunc: POST /ai-menu-recommendations
+activate EdgeFunc
+    note right
+        Input: {
+            "menu_items": [{
+                "id": "uuid",
+                "popularity_score": number,
+                "profit_margin": number,
+                "category": "star|puzzle|plow_horse|dog",
+                "sales_trend": number[]
+            }]
+        }
+    end note
+
+EdgeFunc -> EdgeFunc: Run TensorFlow model\n- Predict future sales\n- Optimize pricing\n- Suggest menu changes
+
+EdgeFunc --> AIService: AIRecommendations
+deactivate EdgeFunc
+    note right
+        Output: {
+            "recommendations": [{
+                "menu_item_id": "uuid",
+                "category": "star|puzzle|plow_horse|dog",
+                "action": "promote|reprice|redesign|remove",
+                "suggested_price": number,
+                "reasoning": "string",
+                "expected_impact": {
+                    "revenue_change": number,
+                    "profit_change": number
+                }
+            }],
+            "overall_insights": "string"
+        }
+    end note
+
+AIService --> MenuService: AnalysisResults
+deactivate AIService
+
+MenuService -> Supabase: saveMenuAnalysis(analysisResults)
+activate Supabase
+Supabase -> DB: INSERT INTO menu_engineering_analysis (...)\nVALUES (...)
+DB --> Supabase: Success
+Supabase --> MenuService: Success
+deactivate Supabase
+
+MenuService --> UI: Analysis completed
+deactivate MenuService
+
+UI --> Chef: Analiz sonuçları ve öneriler
+
+Chef -> UI: Öneriyi uygula
+UI -> MenuService: applyRecommendation(menuItemId, action)
+activate MenuService
+
+alt Action = 'reprice'
+    MenuService -> Supabase: updateMenuItemPrice(menuItemId, newPrice)
+else Action = 'promote'
+    MenuService -> Supabase: updateMenuItemPromotion(menuItemId, true)
+else Action = 'remove'
+    MenuService -> Supabase: deactivateMenuItem(menuItemId)
+end
+
+MenuService --> UI: Recommendation applied
+deactivate MenuService
+
+UI --> Chef: Değişiklik uygulandı
+
+@enduml
+```
+
+### 6.5 Offline Satış Senkronizasyonu
+
+```plantuml
+@startuml
+actor Kasiyer
+participant "POS UI" as UI
+participant "Offline Queue" as Queue
+participant "IndexedDB" as IDB
+participant "Service Worker" as SW
+participant "Sync Service" as SyncService
+participant "Supabase Client" as Supabase
+database "PostgreSQL" as DB
+
+Kasiyer -> UI: İnternet kesildi, satış yap
+activate UI
+
+UI -> UI: Detect offline mode
+
+UI -> Queue: addToOfflineQueue(saleData)
+activate Queue
+    note right
+        Input: {
+            "type": "sale",
+            "data": {
+                "cart_items": [...],
+                "payment_method": "cash",
+                "total_amount": number,
+                "timestamp": "timestamp"
+            },
+            "status": "pending"
+        }
+    end note
+
+Queue -> IDB: store(offlineTransaction)
+activate IDB
+IDB --> Queue: Success
+deactivate IDB
+
+Queue --> UI: Queued for sync
+deactivate Queue
+
+UI --> Kasiyer: Satış kaydedildi (offline)
+
+... İnternet bağlantısı geri geldi ...
+
+SW -> SW: Detect online
+SW -> SyncService: triggerSync()
+activate SyncService
+
+SyncService -> IDB: getPendingTransactions()
+activate IDB
+IDB --> SyncService: OfflineTransaction[]
+deactivate IDB
+
+loop For each pending transaction
+    SyncService -> Supabase: syncTransaction(transaction)
+    activate Supabase
+    
+    alt Transaction type = 'sale'
+        Supabase -> DB: INSERT INTO sales (...)
+        Supabase -> DB: INSERT INTO sale_items (...)
+        Supabase -> DB: UPDATE branch_products (stock)
+        DB --> Supabase: Success
+    else Transaction type = 'expense'
+        Supabase -> DB: INSERT INTO expenses (...)
+        DB --> Supabase: Success
+    else Transaction type = 'time_entry'
+        Supabase -> DB: INSERT INTO time_entries (...)
+        DB --> Supabase: Success
+    end
+    
+    Supabase --> SyncService: Sync result
+    deactivate Supabase
+    
+    alt Sync successful
+        SyncService -> IDB: updateTransactionStatus(id, 'synced')
+        activate IDB
+        IDB --> SyncService: Success
+        deactivate IDB
+    else Sync failed
+        SyncService -> IDB: incrementRetryCount(id)
+        activate IDB
+        IDB --> SyncService: Success
+        deactivate IDB
+    end
+end
+
+SyncService -> UI: Sync completed
+deactivate SyncService
+
+UI -> UI: Refresh data
+
+UI --> Kasiyer: Tüm offline işlemler senkronize edildi
+
+@enduml
+```
+
+## 7. Veritabanı ER Diyagramı
+
+```plantuml
+@startuml
+!define TABLE entity
+!define PK <<PK>>
+!define FK <<FK>>
+
+entity "organizations" as org {
+    * id : uuid <<PK>>
+    --
+    * name : varchar(255)
+    * tax_number : varchar(20) <<UK>>
+    address : text
+    phone : varchar(20)
+    email : varchar(255)
+    logo_url : varchar(500)
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "branches" as branch {
+    * id : uuid <<PK>>
+    --
+    * organization_id : uuid <<FK>>
+    * name : varchar(255)
+    * code : varchar(50) <<UK>>
+    address : text
+    phone : varchar(20)
+    manager_id : uuid <<FK>>
+    is_active : boolean
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "users" as user {
+    * id : uuid <<PK>>
+    --
+    * email : varchar(255) <<UK>>
+    * full_name : varchar(255)
+    phone : varchar(20)
+    * role : enum
+    * branch_id : uuid <<FK>>
+    * organization_id : uuid <<FK>>
+    avatar_url : varchar(500)
+    is_active : boolean
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "categories" as category {
+    * id : uuid <<PK>>
+    --
+    * organization_id : uuid <<FK>>
+    * name : varchar(255)
+    description : text
+    parent_id : uuid <<FK>>
+    sort_order : integer
+    is_active : boolean
+    created_at : timestamp
+}
+
+entity "products" as product {
+    * id : uuid <<PK>>
+    --
+    * organization_id : uuid <<FK>>
+    * category_id : uuid <<FK>>
+    * sku : varchar(100) <<UK>>
+    * name : varchar(255)
+    description : text
+    * base_price : decimal(10,2)
+    * cost_price : decimal(10,2)
+    tax_rate : decimal(5,2)
+    unit : varchar(50)
+    image_url : varchar(500)
+    is_active : boolean
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "branch_products" as branch_product {
+    * id : uuid <<PK>>
+    --
+    * branch_id : uuid <<FK>>
+    * product_id : uuid <<FK>>
+    price_override : decimal(10,2)
+    * stock_quantity : decimal(10,2)
+    min_stock_level : decimal(10,2)
+    is_available : boolean
+    last_stock_update : timestamp
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "sales" as sale {
+    * id : uuid <<PK>>
+    --
+    * branch_id : uuid <<FK>>
+    * cashier_id : uuid <<FK>>
+    * sale_number : varchar(50) <<UK>>
+    * sale_date : timestamp
+    * subtotal : decimal(10,2)
+    * tax_amount : decimal(10,2)
+    discount_amount : decimal(10,2)
+    * total_amount : decimal(10,2)
+    * payment_method : enum
+    * payment_status : enum
+    notes : text
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "sale_items" as sale_item {
+    * id : uuid <<PK>>
+    --
+    * sale_id : uuid <<FK>>
+    * product_id : uuid <<FK>>
+    * quantity : decimal(10,2)
+    * unit_price : decimal(10,2)
+    tax_rate : decimal(5,2)
+    discount_amount : decimal(10,2)
+    * subtotal : decimal(10,2)
+    notes : text
+}
+
+entity "payments" as payment {
+    * id : uuid <<PK>>
+    --
+    * sale_id : uuid <<FK>>
+    * payment_method : varchar(50)
+    * amount : decimal(10,2)
+    transaction_id : varchar(255)
+    * payment_date : timestamp
+    * status : enum
+    created_at : timestamp
+}
+
+entity "shifts" as shift {
+    * id : uuid <<PK>>
+    --
+    * branch_id : uuid <<FK>>
+    * name : varchar(100)
+    * start_time : time
+    * end_time : time
+    days_of_week : integer[]
+    is_active : boolean
+    created_at : timestamp
+}
+
+entity "shift_assignments" as shift_assignment {
+    * id : uuid <<PK>>
+    --
+    * user_id : uuid <<FK>>
+    * shift_id : uuid <<FK>>
+    * date : date
+    * status : enum
+    created_at : timestamp
+}
+
+entity "time_entries" as time_entry {
+    * id : uuid <<PK>>
+    --
+    * user_id : uuid <<FK>>
+    * branch_id : uuid <<FK>>
+    shift_assignment_id : uuid <<FK>>
+    * clock_in : timestamp
+    clock_out : timestamp
+    break_duration : integer
+    total_hours : decimal(5,2)
+    overtime_hours : decimal(5,2)
+    notes : text
+    created_at : timestamp
+}
+
+entity "salary_calculations" as salary {
+    * id : uuid <<PK>>
+    --
+    * user_id : uuid <<FK>>
+    * period_start : date
+    * period_end : date
+    * base_salary : decimal(10,2)
+    overtime_pay : decimal(10,2)
+    bonuses : decimal(10,2)
+    deductions : decimal(10,2)
+    * net_salary : decimal(10,2)
+    * status : enum
+    approved_by : uuid <<FK>>
+    approved_at : timestamp
+    paid_at : timestamp
+    created_at : timestamp
+}
+
+entity "leave_requests" as leave {
+    * id : uuid <<PK>>
+    --
+    * user_id : uuid <<FK>>
+    * leave_type : enum
+    * start_date : date
+    * end_date : date
+    * days_count : integer
+    reason : text
+    * status : enum
+    approved_by : uuid <<FK>>
+    approved_at : timestamp
+    created_at : timestamp
+}
+
+entity "menu_items" as menu {
+    * id : uuid <<PK>>
+    --
+    * organization_id : uuid <<FK>>
+    * name : varchar(255)
+    description : text
+    category : varchar(100)
+    * selling_price : decimal(10,2)
+    target_cost_percentage : decimal(5,2)
+    is_active : boolean
+    image_url : varchar(500)
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "recipes" as recipe {
+    * id : uuid <<PK>>
+    --
+    * menu_item_id : uuid <<FK>>
+    * product_id : uuid <<FK>>
+    * quantity : decimal(10,3)
+    * unit : varchar(50)
+    notes : text
+}
+
+entity "menu_engineering_analysis" as menu_analysis {
+    * id : uuid <<PK>>
+    --
+    * menu_item_id : uuid <<FK>>
+    * branch_id : uuid <<FK>>
+    * analysis_date : date
+    total_sales : integer
+    revenue : decimal(10,2)
+    cost : decimal(10,2)
+    profit : decimal(10,2)
+    profit_margin : decimal(5,2)
+    popularity_score : decimal(5,2)
+    * category : enum
+    ai_recommendation : text
+    created_at : timestamp
+}
+
+entity "expense_categories" as expense_cat {
+    * id : uuid <<PK>>
+    --
+    * organization_id : uuid <<FK>>
+    * name : varchar(255)
+    description : text
+    is_system : boolean
+    parent_id : uuid <<FK>>
+    created_at : timestamp
+}
+
+entity "expenses" as expense {
+    * id : uuid <<PK>>
+    --
+    * branch_id : uuid <<FK>>
+    * category_id : uuid <<FK>>
+    * amount : decimal(10,2)
+    * expense_date : date
+    description : text
+    receipt_url : varchar(500)
+    payment_method : varchar(50)
+    is_recurring : boolean
+    * source_type : enum
+    source_id : uuid
+    * created_by : uuid <<FK>>
+    created_at : timestamp
+}
+
+entity "income_records" as income {
+    * id : uuid <<PK>>
+    --
+    * branch_id : uuid <<FK>>
+    sale_id : uuid <<FK>>
+    * amount : decimal(10,2)
+    * income_date : date
+    description : text
+    created_at : timestamp
+}
+
+entity "financial_reports" as report {
+    * id : uuid <<PK>>
+    --
+    * branch_id : uuid <<FK>>
+    * report_type : enum
+    * period_start : date
+    * period_end : date
+    total_income : decimal(10,2)
+    total_expenses : decimal(10,2)
+    gross_profit : decimal(10,2)
+    net_profit : decimal(10,2)
+    profit_margin : decimal(5,2)
+    report_data : jsonb
+    generated_at : timestamp
+}
+
+' Relationships
+org ||--o{ branch : "has"
+org ||--o{ user : "employs"
+org ||--o{ category : "defines"
+org ||--o{ product : "manages"
+org ||--o{ menu : "offers"
+org ||--o{ expense_cat : "categorizes"
+
+branch ||--o{ user : "employs"
+branch ||--o{ branch_product : "stocks"
+branch ||--o{ sale : "processes"
+branch ||--o{ shift : "schedules"
+branch ||--o{ time_entry : "tracks"
+branch ||--o{ menu_analysis : "analyzes"
+branch ||--o{ expense : "incurs"
+branch ||--o{ income : "earns"
+branch ||--o{ report : "generates"
+
+user ||--o{ sale : "cashier"
+user ||--o{ shift_assignment : "assigned_to"
+user ||--o{ time_entry : "clocks"
+user ||--o{ salary : "earns"
+user ||--o{ leave : "requests"
+user ||--o{ expense : "creates"
+
+category ||--o{ product : "contains"
+category ||--o{ category : "parent"
+
+product ||--o{ branch_product : "stocked_in"
+product ||--o{ sale_item : "sold_as"
+product ||--o{ recipe : "ingredient_of"
+
+sale ||--o{ sale_item : "contains"
+sale ||--o{ payment : "paid_by"
+sale ||--o{ income : "generates"
+
+shift ||--o{ shift_assignment : "assigned"
+shift_assignment ||--o{ time_entry : "records"
+
+menu ||--o{ recipe : "composed_of"
+menu ||--o{ menu_analysis : "analyzed"
+
+expense_cat ||--o{ expense : "categorizes"
+expense_cat ||--o{ expense_cat : "parent"
+
+salary ||--o{ expense : "triggers"
+
+@enduml
+```
+
+## 8. UI Navigasyon Akışı
+
+```plantuml
+@startuml
+!define STATE state
+
+[*] --> Login
+
+state "Login" as Login {
+    [*] --> EmailPassword
+    EmailPassword --> Authenticating
+    Authenticating --> [*] : Success
+    Authenticating --> EmailPassword : Failed
+}
+
+Login --> Dashboard : Authenticated
+
+state "Dashboard" as Dashboard {
+    [*] --> Overview
+    Overview : Günlük özet
+    Overview : Hızlı erişim kartları
+    Overview : Bildirimler
+}
+
+Dashboard --> POSModule : Satış Yap
+Dashboard --> PersonnelModule : Personel
+Dashboard --> BranchModule : Şubeler
+Dashboard --> MenuModule : Menü
+Dashboard --> FinanceModule : Finans
+
+state "POS Module" as POSModule {
+    [*] --> SalesScreen
+    
+    state "Sales Screen" as SalesScreen {
+        [*] --> ProductSearch
+        ProductSearch --> CartView : Ürün Ekle
+        CartView --> PaymentScreen : Ödeme
+        PaymentScreen --> InvoicePreview : Tamamla
+        InvoicePreview --> [*] : Yazdır
+    }
+    
+    SalesScreen --> ProductManagement : Ürün Yönetimi
+    SalesScreen --> InventoryTracking : Stok Takibi
+    SalesScreen --> InvoiceHistory : Fatura Geçmişi
+    
+    ProductManagement --> SalesScreen : Geri
+    InventoryTracking --> SalesScreen : Geri
+    InvoiceHistory --> SalesScreen : Geri
+}
+
+state "Personnel Module" as PersonnelModule {
+    [*] --> ShiftManagement
+    
+    ShiftManagement --> TimeTracking : Puantaj
+    ShiftManagement --> SalaryCalculation : Maaş
+    ShiftManagement --> LeaveManagement : İzin
+    
+    state "Time Tracking" as TimeTracking {
+        [*] --> ClockInOut
+        ClockInOut --> DailyView
+        DailyView --> WeeklyView
+        WeeklyView --> MonthlyView
+    }
+    
+    state "Salary Calculation" as SalaryCalculation {
+        [*] --> EmployeeList
+        EmployeeList --> CalculateSalary : Seç
+        CalculateSalary --> ApprovalScreen : Hesapla
+        ApprovalScreen --> [*] : Onayla
+    }
+    
+    TimeTracking --> ShiftManagement : Geri
+    SalaryCalculation --> ShiftManagement : Geri
+    LeaveManagement --> ShiftManagement : Geri
+}
+
+state "Branch Module" as BranchModule {
+    [*] --> BranchList
+    
+    BranchList --> BranchDetail : Şube Seç
+    BranchList --> CentralProductMgmt : Merkezi Yönetim
+    
+    state "Central Product Management" as CentralProductMgmt {
+        [*] --> ProductCatalog
+        ProductCatalog --> BulkUpdate : Toplu Güncelle
+        BulkUpdate --> BranchSelection : Şube Seç
+        BranchSelection --> ConfirmUpdate : Onayla
+        ConfirmUpdate --> [*] : Uygula
+    }
+    
+    BranchList --> InterBranchTransfer : Transfer
+    BranchList --> PerformanceCompare : Karşılaştır
+    
+    BranchDetail --> BranchList : Geri
+    CentralProductMgmt --> BranchList : Geri
+    InterBranchTransfer --> BranchList : Geri
+    PerformanceCompare --> BranchList : Geri
+}
+
+state "Menu Module" as MenuModule {
+    [*] --> MenuList
+    
+    MenuList --> RecipeManagement : Reçete
+    MenuList --> CostAnalysis : Maliyet
+    MenuList --> AIMenuEngineer : AI Analiz
+    
+    state "AI Menu Engineer" as AIMenuEngineer {
+        [*] --> SelectPeriod
+        SelectPeriod --> RunAnalysis : Başlat
+        RunAnalysis --> ViewResults : Tamamlandı
+        ViewResults --> ApplyRecommendation : Uygula
+        ApplyRecommendation --> [*] : Kaydet
+    }
+    
+    RecipeManagement --> MenuList : Geri
+    CostAnalysis --> MenuList : Geri
+    AIMenuEngineer --> MenuList : Geri
+}
+
+state "Finance Module" as FinanceModule {
+    [*] --> IncomeExpenseTrack
+    
+    IncomeExpenseTrack --> PLReport : Kar-Zarar
+    IncomeExpenseTrack --> Forecasting : Tahmin
+    IncomeExpenseTrack --> BudgetPlanning : Bütçe
+    
+    state "P&L Report" as PLReport {
+        [*] --> SelectPeriod
+        SelectPeriod --> ViewReport : Görüntüle
+        ViewReport --> ExportPDF : İndir
+        ExportPDF --> [*]
+    }
+    
+    PLReport --> IncomeExpenseTrack : Geri
+    Forecasting --> IncomeExpenseTrack : Geri
+    BudgetPlanning --> IncomeExpenseTrack : Geri
+}
+
+POSModule --> Dashboard : Ana Sayfa
+PersonnelModule --> Dashboard : Ana Sayfa
+BranchModule --> Dashboard : Ana Sayfa
+MenuModule --> Dashboard : Ana Sayfa
+FinanceModule --> Dashboard : Ana Sayfa
+
+Dashboard --> [*] : Çıkış
+
+@enduml
+```
+
+### 8.1 Navigasyon Derinliği ve Hiyerarşi
+
+**Seviye 1 (Ana Dashboard)**
+- Tüm modüllere hızlı erişim
+- Kritik metrikler (günlük satış, stok uyarıları, bekleyen onaylar)
+- En sık kullanılan 3 işlev için kısayollar
+
+**Seviye 2 (Modül Ana Sayfaları)**
+- POS: Satış ekranı (varsayılan)
+- Personel: Vardiya yönetimi
+- Şube: Şube listesi
+- Menü: Menü listesi
+- Finans: Gelir-gider takibi
+
+**Seviye 3 (Alt Özellikler)**
+- Her modülün spesifik işlevleri
+- Detaylı görünümler ve raporlar
+- Düzenleme ekranları
+
+**Seviye 4 (Detay/İşlem Ekranları)**
+- Form doldurma
+- Onay ekranları
+- Detaylı analiz görünümleri
+
+**Geri Dönüş Stratejisi:**
+- Her ekranda sol üstte "Geri" butonu
+- Breadcrumb navigasyonu (Ana Sayfa > Modül > Alt Sayfa)
+- Klavye kısayolu: ESC tuşu ile bir üst seviyeye dönüş
+- Mobil: Swipe gesture ile geri gitme
+
+## 9. Güvenlik ve Performans
+
+### 9.1 Authentication ve Authorization
+
+**Supabase Auth Stratejisi:**
+
+```typescript
+// Auth Service Implementation
+export class AuthService {
+  private supabase: SupabaseClient;
+
+  async signIn(email: string, password: string) {
+    const { data, error } = await this.supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    if (error) throw error;
+    
+    // Fetch user role and permissions
+    const { data: userData } = await this.supabase
+      .from('users')
+      .select('role, branch_id, organization_id')
+      .eq('id', data.user.id)
+      .single();
+    
+    return { user: data.user, profile: userData };
+  }
+
+  async signOut() {
+    await this.supabase.auth.signOut();
+  }
+
+  async getCurrentUser() {
+    const { data: { user } } = await this.supabase.auth.getUser();
+    return user;
+  }
+
+  async refreshSession() {
+    const { data, error } = await this.supabase.auth.refreshSession();
+    if (error) throw error;
+    return data;
+  }
+}
+```
+
+**Row Level Security (RLS) Politikaları:**
+
+```sql
+-- Organizations: Sadece kendi organizasyonunu görebilir
+CREATE POLICY "Users can view own organization"
+ON organizations FOR SELECT
+USING (auth.uid() IN (
+  SELECT id FROM users WHERE organization_id = organizations.id
+));
+
+-- Branches: Organizasyon üyeleri tüm şubeleri görebilir
+CREATE POLICY "Organization members can view branches"
+ON branches FOR SELECT
+USING (organization_id IN (
+  SELECT organization_id FROM users WHERE id = auth.uid()
+));
+
+-- Sales: Kasiyer sadece kendi şubesinin satışlarını görebilir
+CREATE POLICY "Cashiers can view own branch sales"
+ON sales FOR SELECT
+USING (
+  branch_id IN (
+    SELECT branch_id FROM users 
+    WHERE id = auth.uid() AND role IN ('cashier', 'manager', 'owner')
+  )
+);
+
+-- Sales: Kasiyer sadece kendi şubesinde satış yapabilir
+CREATE POLICY "Cashiers can insert sales in own branch"
+ON sales FOR INSERT
+WITH CHECK (
+  branch_id IN (
+    SELECT branch_id FROM users 
+    WHERE id = auth.uid() AND role IN ('cashier', 'manager')
+  )
+);
+
+-- Salary Calculations: Sadece manager ve owner görebilir
+CREATE POLICY "Managers can view salary calculations"
+ON salary_calculations FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM users 
+    WHERE id = auth.uid() 
+    AND role IN ('manager', 'owner')
+    AND organization_id IN (
+      SELECT organization_id FROM users WHERE id = salary_calculations.user_id
+    )
+  )
+);
+
+-- Expenses: Sadece kendi şubesinin giderlerini görebilir
+CREATE POLICY "Branch users can view own branch expenses"
+ON expenses FOR SELECT
+USING (
+  branch_id IN (
+    SELECT branch_id FROM users WHERE id = auth.uid()
+  )
+);
+
+-- Menu Engineering: Şube bazlı erişim
+CREATE POLICY "Branch users can view menu analysis"
+ON menu_engineering_analysis FOR SELECT
+USING (
+  branch_id IN (
+    SELECT branch_id FROM users WHERE id = auth.uid()
+  )
+);
+```
+
+**Rol Tabanlı Erişim Kontrol Matrisi:**
+
+| Özellik | Owner | Manager | Cashier | Chef | Staff |
+|---------|-------|---------|---------|------|-------|
+| Dashboard Görüntüleme | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Satış Yapma | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Ürün Yönetimi | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Fiyat Güncelleme | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Personel Maaş Görüntüleme | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Maaş Onaylama | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Şube Ekleme/Silme | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Merkezi Ürün Yönetimi | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Menü Reçete Yönetimi | ✅ | ✅ | ❌ | ✅ | ❌ |
+| AI Menü Analizi | ✅ | ✅ | ❌ | ✅ | ❌ |
+| Finansal Raporlar | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Vardiya Giriş/Çıkış | ✅ | ✅ | ✅ | ✅ | ✅ |
+| İzin Talep Etme | ✅ | ✅ | ✅ | ✅ | ✅ |
+| İzin Onaylama | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+### 9.2 Caching Stratejisi
+
+**React Query Configuration:**
+
+```typescript
+// Query Client Setup
+import { QueryClient } from '@tanstack/react-query';
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 dakika
+      cacheTime: 10 * 60 * 1000, // 10 dakika
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      retry: 3,
+    },
+  },
+});
+
+// Cache Stratejileri
+const CACHE_STRATEGIES = {
+  // Sık değişen veriler - kısa cache
+  sales: {
+    staleTime: 30 * 1000, // 30 saniye
+    cacheTime: 2 * 60 * 1000, // 2 dakika
+  },
+  
+  // Orta sıklıkta değişen veriler
+  products: {
+    staleTime: 5 * 60 * 1000, // 5 dakika
+    cacheTime: 15 * 60 * 1000, // 15 dakika
+  },
+  
+  // Nadiren değişen veriler - uzun cache
+  branches: {
+    staleTime: 30 * 60 * 1000, // 30 dakika
+    cacheTime: 60 * 60 * 1000, // 1 saat
+  },
+  
+  // Statik veriler - çok uzun cache
+  categories: {
+    staleTime: 60 * 60 * 1000, // 1 saat
+    cacheTime: 24 * 60 * 60 * 1000, // 24 saat
+  },
+};
+```
+
+**Supabase Realtime ile Cache Invalidation:**
+
+```typescript
+// Real-time Subscription ile Otomatik Cache Güncelleme
+export function useRealtimeSync(table: string, queryKey: string[]) {
+  const queryClient = useQueryClient();
+  const supabase = useSupabaseClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`${table}_changes`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: table },
+        (payload) => {
+          // Cache'i invalidate et
+          queryClient.invalidateQueries({ queryKey });
+          
+          // Optimistic update için
+          if (payload.eventType === 'INSERT') {
+            queryClient.setQueryData(queryKey, (old: any) => {
+              return [...(old || []), payload.new];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            queryClient.setQueryData(queryKey, (old: any) => {
+              return old?.map((item: any) => 
+                item.id === payload.new.id ? payload.new : item
+              );
+            });
+          } else if (payload.eventType === 'DELETE') {
+            queryClient.setQueryData(queryKey, (old: any) => {
+              return old?.filter((item: any) => item.id !== payload.old.id);
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [table, queryKey]);
+}
+```
+
+### 9.3 Ölçeklenebilirlik Planı
+
+**Veritabanı Optimizasyonu:**
+
+```sql
+-- Kritik İndeksler
+CREATE INDEX idx_sales_branch_date ON sales(branch_id, sale_date DESC);
+CREATE INDEX idx_sales_cashier ON sales(cashier_id);
+CREATE INDEX idx_sale_items_product ON sale_items(product_id);
+CREATE INDEX idx_branch_products_branch ON branch_products(branch_id);
+CREATE INDEX idx_time_entries_user_date ON time_entries(user_id, clock_in DESC);
+CREATE INDEX idx_expenses_branch_date ON expenses(branch_id, expense_date DESC);
+CREATE INDEX idx_menu_analysis_branch_date ON menu_engineering_analysis(branch_id, analysis_date DESC);
+
+-- Composite İndeksler
+CREATE INDEX idx_sales_composite ON sales(branch_id, sale_date, payment_status);
+CREATE INDEX idx_products_composite ON products(organization_id, category_id, is_active);
+
+-- Full-text Search İndeksi
+CREATE INDEX idx_products_search ON products USING gin(to_tsvector('turkish', name || ' ' || COALESCE(description, '')));
+```
+
+**Connection Pooling:**
+
+```typescript
+// Supabase Client Configuration
+import { createClient } from '@supabase/supabase-js';
+
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    db: {
+      schema: 'public',
+    },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10, // Rate limiting
+      },
+    },
+    global: {
+      headers: {
+        'x-application-name': 'integrated-pos-system',
+      },
+    },
+  }
+);
+```
+
+**Horizontal Scaling Stratejisi:**
+
+1. **Şube Bazlı Sharding**: Her şube kendi partition'ında
+2. **Read Replicas**: Raporlama için read-only replika'lar
+3. **CDN**: Statik asset'ler için Vercel Edge Network
+4. **Edge Functions**: Compute-intensive işlemler için
+5. **Queue System**: Ağır işlemler için background job queue
+
+**Performans Metrikleri ve Hedefler:**
+
+| Metrik | Hedef | Kritik Eşik |
+|--------|-------|-------------|
+| Sayfa Yükleme (FCP) | < 1.5s | < 3s |
+| Satış İşlemi Süresi | < 2s | < 5s |
+| API Response Time | < 200ms | < 500ms |
+| Real-time Latency | < 100ms | < 300ms |
+| Database Query Time | < 50ms | < 200ms |
+| Offline Sync Time | < 10s | < 30s |
+
+## 10. Yapay Zeka Entegrasyonu
+
+### 10.1 Menü Mühendisliği AI Modeli
+
+**Model Mimarisi:**
+
+```typescript
+// TensorFlow.js Model
+export class MenuEngineeringAI {
+  private model: tf.LayersModel | null = null;
+
+  async loadModel() {
+    // Pre-trained model yükleme
+    this.model = await tf.loadLayersModel('/models/menu-engineering/model.json');
+  }
+
+  async predictMenuPerformance(menuData: MenuItemData[]): Promise<MenuPrediction[]> {
+    if (!this.model) await this.loadModel();
+
+    // Veri normalizasyonu
+    const normalizedData = this.normalizeData(menuData);
+    
+    // Tensor'a çevirme
+    const inputTensor = tf.tensor2d(normalizedData);
+    
+    // Tahmin
+    const predictions = this.model!.predict(inputTensor) as tf.Tensor;
+    const results = await predictions.array();
+    
+    // Cleanup
+    inputTensor.dispose();
+    predictions.dispose();
+    
+    return this.formatPredictions(results, menuData);
+  }
+
+  private normalizeData(menuData: MenuItemData[]): number[][] {
+    return menuData.map(item => [
+      item.total_sales / 1000, // Normalize sales
+      item.revenue / 10000, // Normalize revenue
+      item.cost / 10000, // Normalize cost
+      item.profit_margin, // Already 0-1
+      item.popularity_score, // Already 0-1
+      this.getDaysSinceLastUpdate(item.updated_at) / 365, // Normalize days
+    ]);
+  }
+
+  private formatPredictions(results: any, menuData: MenuItemData[]): MenuPrediction[] {
+    return results.map((prediction: number[], index: number) => ({
+      menu_item_id: menuData[index].id,
+      predicted_sales: Math.round(prediction[0] * 1000),
+      predicted_revenue: prediction[1] * 10000,
+      predicted_profit_margin: prediction[2],
+      confidence_score: prediction[3],
+      category: this.categorizeMenuItem(
+        prediction[2], // profit_margin
+        menuData[index].popularity_score
+      ),
+    }));
+  }
+
+  private categorizeMenuItem(profitMargin: number, popularityScore: number): MenuCategory {
+    const highProfit = profitMargin > 0.6;
+    const highPopularity = popularityScore > 0.6;
+
+    if (highProfit && highPopularity) return 'star';
+    if (highProfit && !highPopularity) return 'puzzle';
+    if (!highProfit && highPopularity) return 'plow_horse';
+    return 'dog';
+  }
+}
+```
+
+**Edge Function - AI Önerileri:**
+
+```typescript
+// Supabase Edge Function: /functions/ai-menu-recommendations
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+interface MenuAnalysisRequest {
+  menu_items: {
+    id: string;
+    popularity_score: number;
+    profit_margin: number;
+    category: string;
+    sales_trend: number[];
+  }[];
+}
+
+serve(async (req) => {
+  const { menu_items } = await req.json() as MenuAnalysisRequest;
+
+  const recommendations = menu_items.map(item => {
+    let action: string;
+    let reasoning: string;
+    let suggested_price: number | null = null;
+    let expected_impact: any = {};
+
+    switch (item.category) {
+      case 'star':
+        action = 'promote';
+        reasoning = 'Yüksek kar ve popülerlik. Menüde öne çıkarın, upselling yapın.';
+        expected_impact = {
+          revenue_change: 15,
+          profit_change: 20,
+        };
+        break;
+
+      case 'puzzle':
+        action = 'reprice';
+        reasoning = 'Yüksek kar ama düşük popülerlik. Fiyat düşürün veya pazarlamayı artırın.';
+        suggested_price = calculateOptimalPrice(item);
+        expected_impact = {
+          revenue_change: 25,
+          profit_change: 10,
+        };
+        break;
+
+      case 'plow_horse':
+        action = 'optimize';
+        reasoning = 'Yüksek popülerlik ama düşük kar. Maliyetleri düşürün veya fiyat artırın.';
+        suggested_price = calculateOptimalPrice(item);
+        expected_impact = {
+          revenue_change: 5,
+          profit_change: 30,
+        };
+        break;
+
+      case 'dog':
+        action = 'remove';
+        reasoning = 'Düşük kar ve popülerlik. Menüden çıkarın veya tamamen yenileyin.';
+        expected_impact = {
+          revenue_change: -5,
+          profit_change: 5, // Maliyetlerden kurtulma
+        };
+        break;
+
+      default:
+        action = 'monitor';
+        reasoning = 'Daha fazla veri gerekli.';
+    }
+
+    return {
+      menu_item_id: item.id,
+      category: item.category,
+      action,
+      suggested_price,
+      reasoning,
+      expected_impact,
+    };
+  });
+
+  const overall_insights = generateOverallInsights(menu_items, recommendations);
+
+  return new Response(
+    JSON.stringify({
+      recommendations,
+      overall_insights,
+    }),
+    {
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+});
+
+function calculateOptimalPrice(item: any): number {
+  // Basit optimizasyon: mevcut fiyatın %10 üstü veya altı
+  const currentPrice = item.selling_price || 0;
+  
+  if (item.category === 'puzzle') {
+    // Fiyat düşür
+    return currentPrice * 0.9;
+  } else if (item.category === 'plow_horse') {
+    // Fiyat artır
+    return currentPrice * 1.1;
+  }
+  
+  return currentPrice;
+}
+
+function generateOverallInsights(items: any[], recommendations: any[]): string {
+  const starCount = items.filter(i => i.category === 'star').length;
+  const dogCount = items.filter(i => i.category === 'dog').length;
+  const totalItems = items.length;
+
+  let insights = `Menü Analizi: ${totalItems} ürün incelendi.\n\n`;
+  
+  insights += `⭐ Yıldız Ürünler: ${starCount} (${((starCount/totalItems)*100).toFixed(1)}%)\n`;
+  insights += `🐕 Zayıf Ürünler: ${dogCount} (${((dogCount/totalItems)*100).toFixed(1)}%)\n\n`;
+
+  if (starCount < totalItems * 0.2) {
+    insights += '⚠️ Yıldız ürün oranı düşük. Menü optimizasyonu gerekli.\n';
+  }
+
+  if (dogCount > totalItems * 0.3) {
+    insights += '⚠️ Çok fazla zayıf ürün var. Menü sadeleştirmesi önerilir.\n';
+  }
+
+  return insights;
+}
+```
+
+### 10.2 Satış Tahminleme Algoritması
+
+```typescript
+// Satış Tahminleme Servisi
+export class SalesForecastingService {
+  async forecastSales(
+    branchId: string,
+    productId: string,
+    forecastDays: number
+  ): Promise<ForecastResult> {
+    // Geçmiş satış verilerini al (son 90 gün)
+    const historicalSales = await this.getHistoricalSales(branchId, productId, 90);
+
+    // Trend analizi
+    const trend = this.calculateTrend(historicalSales);
+    
+    // Mevsimsellik analizi
+    const seasonality = this.calculateSeasonality(historicalSales);
+    
+    // Tahmin hesaplama (Simple Exponential Smoothing)
+    const forecast = this.exponentialSmoothing(
+      historicalSales,
+      trend,
+      seasonality,
+      forecastDays
+    );
+
+    return {
+      product_id: productId,
+      branch_id: branchId,
+      forecast_period: forecastDays,
+      predicted_sales: forecast,
+      confidence_interval: this.calculateConfidenceInterval(forecast, historicalSales),
+      trend_direction: trend > 0 ? 'increasing' : trend < 0 ? 'decreasing' : 'stable',
+    };
+  }
+
+  private calculateTrend(sales: number[]): number {
+    // Linear regression ile trend hesaplama
+    const n = sales.length;
+    const x = Array.from({ length: n }, (_, i) => i);
+    const y = sales;
+
+    const sumX = x.reduce((a, b) => a + b, 0);
+    const sumY = y.reduce((a, b) => a + b, 0);
+    const sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
+    const sumX2 = x.reduce((sum, xi) => sum + xi * xi, 0);
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    return slope;
+  }
+
+  private calculateSeasonality(sales: number[]): number[] {
+    // 7 günlük mevsimsellik (haftalık pattern)
+    const weeklyPattern = Array(7).fill(0);
+    
+    sales.forEach((sale, index) => {
+      const dayOfWeek = index % 7;
+      weeklyPattern[dayOfWeek] += sale;
+    });
+
+    const avgSale = sales.reduce((a, b) => a + b, 0) / sales.length;
+    return weeklyPattern.map(total => total / (sales.length / 7) / avgSale);
+  }
+
+  private exponentialSmoothing(
+    historical: number[],
+    trend: number,
+    seasonality: number[],
+    periods: number
+  ): number[] {
+    const alpha = 0.3; // Smoothing factor
+    const forecast: number[] = [];
+    
+    let lastValue = historical[historical.length - 1];
+    
+    for (let i = 0; i < periods; i++) {
+      const seasonalIndex = (historical.length + i) % 7;
+      const seasonalFactor = seasonality[seasonalIndex];
+      
+      const predicted = (lastValue + trend) * seasonalFactor;
+      forecast.push(Math.max(0, Math.round(predicted)));
+      
+      lastValue = predicted;
+    }
+
+    return forecast;
+  }
+
+  private calculateConfidenceInterval(
+    forecast: number[],
+    historical: number[]
+  ): { lower: number[]; upper: number[] } {
+    const stdDev = this.standardDeviation(historical);
+    const margin = 1.96 * stdDev; // 95% confidence interval
+
+    return {
+      lower: forecast.map(f => Math.max(0, Math.round(f - margin))),
+      upper: forecast.map(f => Math.round(f + margin)),
+    };
+  }
+
+  private standardDeviation(values: number[]): number {
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    const squareDiffs = values.map(value => Math.pow(value - avg, 2));
+    const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / values.length;
+    return Math.sqrt(avgSquareDiff);
+  }
+}
+```
+
+## 11. Belirsiz Noktalar
+
+### 11.1 Teknik Belirsizlikler
+
+1. **Ödeme Gateway Entegrasyonu**
+   - **Soru**: Hangi ödeme gateway'leri desteklenecek? (iyzico, PayTR, Stripe?)
+   - **Öneri**: MVP için tek bir gateway (iyzico - Türkiye'de yaygın), sonra genişletme
+   - **Etki**: API entegrasyonu ve test süreci
+   - **Cevap**: PAVO, Ingenico, PayTR, Nkolay, gibi ödeme yöntemlerini destekleyecek, entegre çalışacak.
+
+2. **E-Fatura Entegrasyonu**
+   - **Soru**: GİB e-fatura sistemi ile entegrasyon gerekli mi?
+   - **Öneri**: İlk versiyonda manuel fatura, sonraki versiyonda e-fatura
+   - **Etki**: Ek geliştirme zamanı ve maliyet
+   - **Cevap**: Evet, gerekli.
+
+3. **Offline Mod Kapsamı**
+   - **Soru**: Hangi işlemler offline çalışabilmeli?
+   - **Öneri**: Sadece POS satış işlemleri ve vardiya giriş/çıkış
+   - **Etki**: IndexedDB storage boyutu ve senkronizasyon karmaşıklığı
+   - **Cevap**: Öneri makul.
+
+4. **AI Model Training**
+   - **Soru**: AI modeli nereden eğitilecek? Başlangıç verisi var mı?
+   - **Öneri**: Pre-trained model + transfer learning, demo verisi ile başlama
+   - **Etki**: Model accuracy ve önerilerin kalitesi
+   - **Cevap**: AI geliştirme işletme konusunda bilgili kişiler tarafından ve webdeki bilgilerle eğitiliecek.
+
+5. **Real-time Subscription Limitleri**
+   - **Soru**: Kaç eşzamanlı kullanıcı desteklenecek?
+   - **Öneri**: Supabase plan limitlerine göre (Pro plan: 500 concurrent connections)
+   - **Etki**: Ölçeklenebilirlik ve maliyet
+   - **Cevap**: Hacime bağlı olarak desteklenecek ilk etapta minimum tutulacak.
+
+### 11.2 İş Mantığı Belirsizlikleri
+
+1. **Maaş Hesaplama Formülü**
+   - **Soru**: Mesai ücreti, fazla mesai, prim, kesintiler nasıl hesaplanacak?
+   - **Öneri**: Türk İş Kanunu'na uygun standart formül + özelleştirilebilir parametreler
+   - **Etki**: Salary calculation edge function karmaşıklığı
+   - **Cevap**: Özelleştirilebilir hesaplama modülleri kullanılacak.
+
+2. **Stok Yönetimi Stratejisi**
+   - **Soru**: Stok eksilme otomatik mi olacak? Manuel düzeltme yapılabilecek mi?
+   - **Öneri**: Satışta otomatik eksilme + manuel düzeltme yetkisi (manager+)
+   - **Etki**: Stok tutarsızlığı riski
+   - **Cevap**: Öneri makul.
+
+3. **Şubeler Arası Transfer Onayı**
+   - **Soru**: Transfer işlemi otomatik mi, onay gerektiriyor mu?
+   - **Öneri**: Gönderen şube onayı + alan şube onayı (iki aşamalı)
+   - **Etki**: Transfer süreci ve UI akışı
+   - **Cevap**: Öneri makul.
+
+4. **Menü Reçete Maliyet Güncelleme**
+   - **Soru**: Ürün maliyeti değiştiğinde menü fiyatları otomatik güncellenecek mi?
+   - **Öneri**: Uyarı göster + manuel onay (otomatik güncelleme riskli)
+   - **Etki**: Fiyat tutarlılığı ve kar marjı koruması
+   - **Cevap**: Öneri makul.
+
+5. **Finansal Rapor Periyodu**
+   - **Soru**: Raporlar hangi periyotlarda otomatik oluşturulacak?
+   - **Öneri**: Günlük otomatik, haftalık/aylık/yıllık manuel veya scheduled
+   - **Etki**: Database storage ve hesaplama maliyeti
+   - **Cevap**: Öneri makul.
+
+### 11.3 Kullanıcı Deneyimi Belirsizlikleri
+
+1. **Mobil Uygulama Gereksinimi**
+   - **Soru**: Native mobil app gerekli mi, PWA yeterli mi?
+   - **Öneri**: MVP için PWA (responsive web), sonra native app değerlendirme
+   - **Etki**: Geliştirme süresi ve maliyet
+   - **Cevap**: Öneri makul.
+
+2. **Çoklu Dil Desteği**
+   - **Soru**: Sadece Türkçe mi, yoksa İngilizce de gerekli mi?
+   - **Öneri**: MVP için sadece Türkçe, i18n altyapısı hazır tutulmalı
+   - **Etki**: Lokalizasyon çalışması
+   - **Cevap**: Öneri makul.
+
+3. **Bildirim Sistemi**
+   - **Soru**: Push notification, email, SMS hangileri desteklenecek?
+   - **Öneri**: MVP için in-app notification + email, sonra SMS/push
+   - **Etki**: Notification service entegrasyonu
+   - **Cevap**: Öneri makul.
+
+4. **Dashboard Özelleştirme**
+   - **Soru**: Kullanıcılar dashboard widget'larını özelleştirebilecek mi?
+   - **Öneri**: İlk versiyonda sabit layout, sonra drag-drop özelleştirme
+   - **Etki**: UI karmaşıklığı
+   - **Cevap**: Öneri makul.
+
+5. **Veri Export Formatları**
+   - **Soru**: Hangi formatlarda export desteklenecek? (PDF, Excel, CSV?)
+   - **Öneri**: PDF (raporlar için) + Excel (veri analizi için)
+   - **Etki**: Export library'leri ve dosya boyutu
+   - **Cevap**: Öneri makul.
+
+## 12. Geliştirme Yol Haritası
+
+### Faz 1: MVP (8-10 hafta)
+- Temel POS işlemleri
+- Basit ürün ve stok yönetimi
+- Kullanıcı authentication
+- Tek şube desteği
+- Temel raporlama
+
+### Faz 2: Personel ve Şube (6-8 hafta)
+- Vardiya yönetimi
+- Puantaj sistemi
+- Maaş hesaplama
+- Çoklu şube desteği
+- Merkezi ürün yönetimi
+
+### Faz 3: Menü ve AI (6-8 hafta)
+- Menü reçete yönetimi
+- Maliyet analizi
+- AI menü mühendisliği
+- Satış tahminleme
+
+### Faz 4: Finans ve Optimizasyon (4-6 hafta)
+- Gelişmiş finansal raporlar
+- Kar-zarar analizi
+- Bütçe planlama
+- Performans optimizasyonu
+
+### Faz 5: Entegrasyonlar (4-6 hafta)
+- Ödeme gateway'leri
+- E-fatura entegrasyonu
+- Üçüncü parti servisler
+- Mobile app (opsiyonel)
+
+**Toplam Tahmini Süre**: 28-38 hafta (7-9.5 ay)

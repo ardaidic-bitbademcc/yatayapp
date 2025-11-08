@@ -1,0 +1,93 @@
+@startuml
+package "POS Module" {
+    [Sales Screen] as Sales
+    [Product Management] as Products
+    [Inventory Sync] as Inventory
+    [Invoice Generator] as Invoice
+}
+
+package "Personnel Module" {
+    [Shift Management] as Shifts
+    [Time Tracking] as TimeTrack
+    [Salary Calculator] as Salary
+    [Leave Management] as Leave
+}
+
+package "Branch Module" {
+    [Branch List] as Branches
+    [Central Product Mgmt] as CentralProducts
+    [Inter-branch Transfer] as Transfer
+    [Performance Compare] as Performance
+}
+
+package "Menu Module" {
+    [Menu List] as MenuList
+    [Recipe Management] as Recipes
+    [Cost Analysis] as CostAnalysis
+    [AI Menu Engineer] as AIMenu
+}
+
+package "Finance Module" {
+    [Income/Expense Track] as IncomeExpense
+    [P&L Report] as PL
+    [Forecasting] as Forecast
+    [Budget Planning] as Budget
+}
+
+package "Shared Services" {
+    [Auth Service] as Auth
+    [Notification Service] as Notify
+    [Report Service] as Report
+    [Sync Service] as Sync
+    [Cache Service] as Cache
+}
+
+package "Data Layer" {
+    database "Supabase PostgreSQL" as DB
+    [Real-time Subscriptions] as RT
+}
+
+Sales --> Inventory
+Sales --> Invoice
+Invoice --> IncomeExpense
+
+Shifts --> TimeTrack
+TimeTrack --> Salary
+Salary --> IncomeExpense
+
+CentralProducts --> Branches
+Transfer --> Inventory
+
+Recipes --> CostAnalysis
+CostAnalysis --> AIMenu
+AIMenu --> MenuList
+
+IncomeExpense --> PL
+PL --> Forecast
+Forecast --> Budget
+
+Sales --> Auth
+Shifts --> Auth
+Branches --> Auth
+MenuList --> Auth
+IncomeExpense --> Auth
+
+Salary --> Notify
+Transfer --> Notify
+AIMenu --> Notify
+
+PL --> Report
+Performance --> Report
+
+Branches --> Sync
+Inventory --> Sync
+
+Sales --> Cache
+Products --> Cache
+
+Auth --> DB
+Notify --> DB
+Report --> DB
+Sync --> RT
+Cache --> DB
+@enduml

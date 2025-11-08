@@ -1,0 +1,74 @@
+@startuml
+!define RECTANGLE class
+
+package "Frontend Layer" {
+    [Next.js App] as NextApp
+    [React Components] as Components
+    [Shadcn UI] as ShadcnUI
+    [State Management\n(Zustand)] as State
+    [React Query\n(Cache)] as ReactQuery
+    [Service Workers\n(Offline)] as SW
+}
+
+package "API Layer" {
+    [Supabase Client] as SupabaseClient
+    [Real-time\nSubscriptions] as Realtime
+    [Auth Service] as AuthService
+    [Storage Service] as StorageService
+}
+
+package "Backend Layer (Supabase)" {
+    database "PostgreSQL\nDatabase" as DB {
+        [Tables]
+        [Views]
+        [Functions]
+        [Triggers]
+    }
+    [Row Level\nSecurity (RLS)] as RLS
+    [Edge Functions] as EdgeFunctions
+    [Real-time Server] as RealtimeServer
+    [Auth Server] as AuthServer
+    [Storage Buckets] as Storage
+}
+
+package "External Services" {
+    [AI/ML Models\n(TensorFlow.js)] as AI
+    [Payment Gateway\n(iyzico/PayTR)] as Payment
+    [E-Invoice\nIntegration] as EInvoice
+}
+
+package "Client Storage" {
+    [IndexedDB\n(Offline Queue)] as IndexedDB
+    [Local Storage\n(Settings)] as LocalStorage
+}
+
+NextApp --> Components
+Components --> ShadcnUI
+Components --> State
+Components --> ReactQuery
+NextApp --> SW
+
+ReactQuery --> SupabaseClient
+State --> SupabaseClient
+SupabaseClient --> Realtime
+SupabaseClient --> AuthService
+SupabaseClient --> StorageService
+
+Realtime --> RealtimeServer
+AuthService --> AuthServer
+StorageService --> Storage
+
+SupabaseClient --> DB
+DB --> RLS
+DB --> EdgeFunctions
+
+Components --> AI
+SupabaseClient --> Payment
+SupabaseClient --> EInvoice
+
+SW --> IndexedDB
+State --> LocalStorage
+
+RealtimeServer --> DB
+EdgeFunctions --> DB
+@enduml

@@ -1,0 +1,348 @@
+@startuml
+!define TABLE entity
+!define PK <<PK>>
+!define FK <<FK>>
+
+entity "organizations" as org {
+    * id : uuid <<PK>>
+    --
+    * name : varchar(255)
+    * tax_number : varchar(20) <<UK>>
+    address : text
+    phone : varchar(20)
+    email : varchar(255)
+    logo_url : varchar(500)
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "branches" as branch {
+    * id : uuid <<PK>>
+    --
+    * organization_id : uuid <<FK>>
+    * name : varchar(255)
+    * code : varchar(50) <<UK>>
+    address : text
+    phone : varchar(20)
+    manager_id : uuid <<FK>>
+    is_active : boolean
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "users" as user {
+    * id : uuid <<PK>>
+    --
+    * email : varchar(255) <<UK>>
+    * full_name : varchar(255)
+    phone : varchar(20)
+    * role : enum
+    * branch_id : uuid <<FK>>
+    * organization_id : uuid <<FK>>
+    avatar_url : varchar(500)
+    is_active : boolean
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "categories" as category {
+    * id : uuid <<PK>>
+    --
+    * organization_id : uuid <<FK>>
+    * name : varchar(255)
+    description : text
+    parent_id : uuid <<FK>>
+    sort_order : integer
+    is_active : boolean
+    created_at : timestamp
+}
+
+entity "products" as product {
+    * id : uuid <<PK>>
+    --
+    * organization_id : uuid <<FK>>
+    * category_id : uuid <<FK>>
+    * sku : varchar(100) <<UK>>
+    * name : varchar(255)
+    description : text
+    * base_price : decimal(10,2)
+    * cost_price : decimal(10,2)
+    tax_rate : decimal(5,2)
+    unit : varchar(50)
+    image_url : varchar(500)
+    is_active : boolean
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "branch_products" as branch_product {
+    * id : uuid <<PK>>
+    --
+    * branch_id : uuid <<FK>>
+    * product_id : uuid <<FK>>
+    price_override : decimal(10,2)
+    * stock_quantity : decimal(10,2)
+    min_stock_level : decimal(10,2)
+    is_available : boolean
+    last_stock_update : timestamp
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "sales" as sale {
+    * id : uuid <<PK>>
+    --
+    * branch_id : uuid <<FK>>
+    * cashier_id : uuid <<FK>>
+    * sale_number : varchar(50) <<UK>>
+    * sale_date : timestamp
+    * subtotal : decimal(10,2)
+    * tax_amount : decimal(10,2)
+    discount_amount : decimal(10,2)
+    * total_amount : decimal(10,2)
+    * payment_method : enum
+    * payment_status : enum
+    notes : text
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "sale_items" as sale_item {
+    * id : uuid <<PK>>
+    --
+    * sale_id : uuid <<FK>>
+    * product_id : uuid <<FK>>
+    * quantity : decimal(10,2)
+    * unit_price : decimal(10,2)
+    tax_rate : decimal(5,2)
+    discount_amount : decimal(10,2)
+    * subtotal : decimal(10,2)
+    notes : text
+}
+
+entity "payments" as payment {
+    * id : uuid <<PK>>
+    --
+    * sale_id : uuid <<FK>>
+    * payment_method : varchar(50)
+    * amount : decimal(10,2)
+    transaction_id : varchar(255)
+    * payment_date : timestamp
+    * status : enum
+    created_at : timestamp
+}
+
+entity "shifts" as shift {
+    * id : uuid <<PK>>
+    --
+    * branch_id : uuid <<FK>>
+    * name : varchar(100)
+    * start_time : time
+    * end_time : time
+    days_of_week : integer[]
+    is_active : boolean
+    created_at : timestamp
+}
+
+entity "shift_assignments" as shift_assignment {
+    * id : uuid <<PK>>
+    --
+    * user_id : uuid <<FK>>
+    * shift_id : uuid <<FK>>
+    * date : date
+    * status : enum
+    created_at : timestamp
+}
+
+entity "time_entries" as time_entry {
+    * id : uuid <<PK>>
+    --
+    * user_id : uuid <<FK>>
+    * branch_id : uuid <<FK>>
+    shift_assignment_id : uuid <<FK>>
+    * clock_in : timestamp
+    clock_out : timestamp
+    break_duration : integer
+    total_hours : decimal(5,2)
+    overtime_hours : decimal(5,2)
+    notes : text
+    created_at : timestamp
+}
+
+entity "salary_calculations" as salary {
+    * id : uuid <<PK>>
+    --
+    * user_id : uuid <<FK>>
+    * period_start : date
+    * period_end : date
+    * base_salary : decimal(10,2)
+    overtime_pay : decimal(10,2)
+    bonuses : decimal(10,2)
+    deductions : decimal(10,2)
+    * net_salary : decimal(10,2)
+    * status : enum
+    approved_by : uuid <<FK>>
+    approved_at : timestamp
+    paid_at : timestamp
+    created_at : timestamp
+}
+
+entity "leave_requests" as leave {
+    * id : uuid <<PK>>
+    --
+    * user_id : uuid <<FK>>
+    * leave_type : enum
+    * start_date : date
+    * end_date : date
+    * days_count : integer
+    reason : text
+    * status : enum
+    approved_by : uuid <<FK>>
+    approved_at : timestamp
+    created_at : timestamp
+}
+
+entity "menu_items" as menu {
+    * id : uuid <<PK>>
+    --
+    * organization_id : uuid <<FK>>
+    * name : varchar(255)
+    description : text
+    category : varchar(100)
+    * selling_price : decimal(10,2)
+    target_cost_percentage : decimal(5,2)
+    is_active : boolean
+    image_url : varchar(500)
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+entity "recipes" as recipe {
+    * id : uuid <<PK>>
+    --
+    * menu_item_id : uuid <<FK>>
+    * product_id : uuid <<FK>>
+    * quantity : decimal(10,3)
+    * unit : varchar(50)
+    notes : text
+}
+
+entity "menu_engineering_analysis" as menu_analysis {
+    * id : uuid <<PK>>
+    --
+    * menu_item_id : uuid <<FK>>
+    * branch_id : uuid <<FK>>
+    * analysis_date : date
+    total_sales : integer
+    revenue : decimal(10,2)
+    cost : decimal(10,2)
+    profit : decimal(10,2)
+    profit_margin : decimal(5,2)
+    popularity_score : decimal(5,2)
+    * category : enum
+    ai_recommendation : text
+    created_at : timestamp
+}
+
+entity "expense_categories" as expense_cat {
+    * id : uuid <<PK>>
+    --
+    * organization_id : uuid <<FK>>
+    * name : varchar(255)
+    description : text
+    is_system : boolean
+    parent_id : uuid <<FK>>
+    created_at : timestamp
+}
+
+entity "expenses" as expense {
+    * id : uuid <<PK>>
+    --
+    * branch_id : uuid <<FK>>
+    * category_id : uuid <<FK>>
+    * amount : decimal(10,2)
+    * expense_date : date
+    description : text
+    receipt_url : varchar(500)
+    payment_method : varchar(50)
+    is_recurring : boolean
+    * source_type : enum
+    source_id : uuid
+    * created_by : uuid <<FK>>
+    created_at : timestamp
+}
+
+entity "income_records" as income {
+    * id : uuid <<PK>>
+    --
+    * branch_id : uuid <<FK>>
+    sale_id : uuid <<FK>>
+    * amount : decimal(10,2)
+    * income_date : date
+    description : text
+    created_at : timestamp
+}
+
+entity "financial_reports" as report {
+    * id : uuid <<PK>>
+    --
+    * branch_id : uuid <<FK>>
+    * report_type : enum
+    * period_start : date
+    * period_end : date
+    total_income : decimal(10,2)
+    total_expenses : decimal(10,2)
+    gross_profit : decimal(10,2)
+    net_profit : decimal(10,2)
+    profit_margin : decimal(5,2)
+    report_data : jsonb
+    generated_at : timestamp
+}
+
+' Relationships
+org ||--o{ branch : "has"
+org ||--o{ user : "employs"
+org ||--o{ category : "defines"
+org ||--o{ product : "manages"
+org ||--o{ menu : "offers"
+org ||--o{ expense_cat : "categorizes"
+
+branch ||--o{ user : "employs"
+branch ||--o{ branch_product : "stocks"
+branch ||--o{ sale : "processes"
+branch ||--o{ shift : "schedules"
+branch ||--o{ time_entry : "tracks"
+branch ||--o{ menu_analysis : "analyzes"
+branch ||--o{ expense : "incurs"
+branch ||--o{ income : "earns"
+branch ||--o{ report : "generates"
+
+user ||--o{ sale : "cashier"
+user ||--o{ shift_assignment : "assigned_to"
+user ||--o{ time_entry : "clocks"
+user ||--o{ salary : "earns"
+user ||--o{ leave : "requests"
+user ||--o{ expense : "creates"
+
+category ||--o{ product : "contains"
+category ||--o{ category : "parent"
+
+product ||--o{ branch_product : "stocked_in"
+product ||--o{ sale_item : "sold_as"
+product ||--o{ recipe : "ingredient_of"
+
+sale ||--o{ sale_item : "contains"
+sale ||--o{ payment : "paid_by"
+sale ||--o{ income : "generates"
+
+shift ||--o{ shift_assignment : "assigned"
+shift_assignment ||--o{ time_entry : "records"
+
+menu ||--o{ recipe : "composed_of"
+menu ||--o{ menu_analysis : "analyzed"
+
+expense_cat ||--o{ expense : "categorizes"
+expense_cat ||--o{ expense_cat : "parent"
+
+salary ||--o{ expense : "triggers"
+@enduml
