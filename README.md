@@ -35,6 +35,13 @@ Bu repo şu an mimari iskeleti ve temel başlangıç kodlarını içerir.
 
 Detaylı adımlar ilgili klasörlerin README dosyalarında bulunmaktadır.
 
+## Deploy
+
+- **Token oluşturamıyorum:** `docs/GITHUB_TOKEN_GUIDE.md` (alternatif yollar)
+- **Manuel secrets ekleme:** `docs/MANUAL_SECRETS_SETUP.md` (adım adım UI rehberi)
+- Hızlı başlangıç ve üretim/önizleme dağıtımı: `docs/DEPLOYMENT.md`
+- CI & Pipeline ayrıntıları (tetikleyici, raporlar, secrets): `docs/CI.md`
+
 ## Notlar ve Varsayımlar
 
 - Backend Supabase üzerinde yönetilecek (PostgreSQL, Auth, Storage, Realtime, Edge Functions)

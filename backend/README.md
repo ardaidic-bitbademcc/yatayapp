@@ -27,10 +27,12 @@ backend/supabase/
 #### Yöntem A: Supabase Dashboard SQL Editor
 
 1. Dashboard → SQL Editor'e git
-2. Sırayla şu dosyaları çalıştır:
-   - `sql/schema.sql` (tablolar, enum'lar, triggerlar)
-   - `sql/indexes.sql` (performans indeksleri)
-   - `sql/policies.sql` (RLS politikaları)
+2. Hızlı demo için sadece `sql/demo_seed_tables.sql` dosyasını çalıştır
+  - Bu dosya, demo endpoint'lerinin beklediği minimal tabloları oluşturur ve örnek veri ekler.
+3. Uzun vadeli ve kapsamlı kurulum için sırayla şu dosyaları çalıştır:
+  - `sql/schema.sql` (tablolar, enum'lar, triggerlar)
+  - `sql/indexes.sql` (performans indeksleri)
+  - `sql/policies.sql` (RLS politikaları)
 
 #### Yöntem B: Supabase CLI (önerilen)
 

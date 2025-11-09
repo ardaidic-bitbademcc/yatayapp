@@ -8,8 +8,14 @@ export async function POST(req: NextRequest) {
 
   const tokenRequired = !!process.env.DEMO_SETUP_TOKEN;
   const headerToken = req.headers.get('x-demo-setup-token');
+  
+  // Debug: Log token values (remove in production)
+  console.log('[DEBUG] tokenRequired:', tokenRequired);
+  console.log('[DEBUG] headerToken present:', !!headerToken);
+  console.log('[DEBUG] tokens match:', headerToken === process.env.DEMO_SETUP_TOKEN);
+  
   if (tokenRequired && headerToken !== process.env.DEMO_SETUP_TOKEN) {
-    return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 });
+    return NextResponse.json({ error: 'Yetkisiz istek' }, { status: 401 });
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;

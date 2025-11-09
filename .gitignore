@@ -12,6 +12,8 @@ out/
 # Ortam Değişkenleri
 .env*
 !.env.example
+scripts/secrets/.env.secrets
+scripts/secrets/.env.secrets.example
 
 # Supabase
 backend/supabase/.temp/

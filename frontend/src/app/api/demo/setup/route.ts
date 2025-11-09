@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 
 // Demo veri ve demo kullanıcı oluşturma endpoint'i.
 // ÖNEMLİ: Gerçek üretimde bu endpoint mutlaka auth kontrolü ve rate limit ile korunmalı.
@@ -9,8 +10,18 @@ export async function POST() {
     return NextResponse.json({ error: 'Demo modu kapalı' }, { status: 403 });
   }
 
+  // Supabase client seçimi: Servis rolü varsa onu kullan, yoksa anon client ile devam et
+  const useServiceRole = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const db = useServiceRole
+    ? createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      )
+    : supabase;
+
   // Basit kontrol: zaten bir ürün varsa tekrar ekleme yapma.
-  const { data: existingProducts } = await supabase.from('products').select('id').limit(1);
+  const { data: existingProducts } = await db.from('products').select('id').limit(1);
 
   // Demo kullanıcı yaratma (Supabase admin API veya service role gerekir - burada anon ile olmaz)
   // Burada sadece en azından tabloları doldurmayı deniyoruz.
@@ -18,32 +29,32 @@ export async function POST() {
   const inserts: any[] = [];
 
   if (!existingProducts || existingProducts.length === 0) {
-    inserts.push(supabase.from('products').insert([
+    inserts.push(db.from('products').insert([
       { name: 'Espresso', price: 55 },
       { name: 'Latte', price: 65 },
       { name: 'Filtre Kahve', price: 50 }
     ]));
   }
 
-  const { data: existingBranches } = await supabase.from('branches').select('id').limit(1);
+  const { data: existingBranches } = await db.from('branches').select('id').limit(1);
   if (!existingBranches || existingBranches.length === 0) {
-    inserts.push(supabase.from('branches').insert([
+    inserts.push(db.from('branches').insert([
       { name: 'Merkez', address: 'İstiklal Cad. No:1' },
       { name: 'Şube 2', address: 'Bağdat Cad. No:45' }
     ]));
   }
 
-  const { data: existingPersonnel } = await supabase.from('personnel').select('id').limit(1);
+  const { data: existingPersonnel } = await db.from('personnel').select('id').limit(1);
   if (!existingPersonnel || existingPersonnel.length === 0) {
-    inserts.push(supabase.from('personnel').insert([
+    inserts.push(db.from('personnel').insert([
       { name: 'Ayşe', title: 'Barista' },
       { name: 'Mehmet', title: 'Kasiyer' }
     ]));
   }
 
-  const { data: existingIncome } = await supabase.from('income_records').select('id').limit(1);
+  const { data: existingIncome } = await db.from('income_records').select('id').limit(1);
   if (!existingIncome || existingIncome.length === 0) {
-    inserts.push(supabase.from('income_records').insert([
+    inserts.push(db.from('income_records').insert([
       { description: 'Günlük Satış', amount: 1250 },
       { description: 'Yan Gelir', amount: 300 }
     ]));
