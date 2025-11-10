@@ -34,6 +34,7 @@ export default function PosPage() {
   const [pending, setPending] = useState<any[]>([]);
   const [showSplitPayment, setShowSplitPayment] = useState(false);
   const [splitPayments, setSplitPayments] = useState<{ method_id: string; method_name: string; amount: number }[]>([]);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const { data: items = [] } = useOrderItems(order?.id);
   const total = useMemo(() => items.reduce((s, it) => s + Number(it.line_total || 0), 0), [items]);
@@ -200,6 +201,44 @@ export default function PosPage() {
     setSplitPayments([]);
   };
 
+  const onCancelOrder = () => {
+    setShowCancelConfirm(true);
+  };
+
+  const confirmCancelOrder = async () => {
+    if (!order || !selectedTable) return;
+
+    // Sipariş kalemlerini sil
+    const { error: itemsErr } = await supabase.from('order_items').delete().eq('order_id', order.id);
+    if (itemsErr) {
+      alert(`Kalemler silinemedi: ${itemsErr.message}`);
+      return;
+    }
+
+    // Siparişi iptal et
+    const { error: ordErr } = await supabase.from('orders').update({ 
+      status: 'cancelled', 
+      closed_at: new Date().toISOString() 
+    }).eq('id', order.id);
+    if (ordErr) {
+      alert(`Sipariş iptal edilemedi: ${ordErr.message}`);
+      return;
+    }
+
+    // Masa boşalt
+    await supabase.from('tables').update({ status: 'empty' }).eq('id', selectedTable.id);
+
+    console.log('[PRINTER_STUB] Sipariş iptal edildi:', {
+      table: selectedTable.name,
+      order_id: order.id
+    });
+
+    setOrder(null);
+    setSelectedTable(null);
+    setPending([]);
+    setShowCancelConfirm(false);
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -275,6 +314,19 @@ export default function PosPage() {
                 </div>
               )}
 
+              {/* Cancel Order Modal */}
+              {showCancelConfirm && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                    <h2 className="text-xl font-bold mb-4">Siparişi İptal Et</h2>
+                    <p className="text-sm text-muted-foreground mb-4">Bu işlem siparişteki tüm kalemleri silecek ve masayı boşaltacaktır. Devam etmek istiyor musunuz?</p>
+                    <div className="flex gap-2">
+                      <Button className="flex-1" variant="destructive" onClick={confirmCancelOrder}>Evet, İptal Et</Button>
+                      <Button variant="outline" onClick={() => setShowCancelConfirm(false)}>Vazgeç</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
               <ul className="divide-y">
                 {items.map((it: any) => (
                   <li key={it.id} className="py-2 flex items-center justify-between gap-2">
@@ -310,6 +362,9 @@ export default function PosPage() {
                   </div>
                   <Button variant="outline" className="w-full mt-2" onClick={onSplitPayment}>
                     Bölünmüş Ödeme
+                  </Button>
+                  <Button variant="destructive" className="w-full mt-2" onClick={onCancelOrder}>
+                    Siparişi İptal Et
                   </Button>
                   {paymentMethods.length === 0 && <div className="text-xs text-muted-foreground mt-2">Ödeme yöntemi yok. Ayarlar {'>'} Ödeme Yöntemleri</div>}
                 </div>
@@ -369,6 +424,8 @@ export default function PosPage() {
                 ))}
               </div>
             )}
+
+            
 
             <div className="mb-4">
               <h3 className="text-sm font-medium mb-2">Ödeme Yöntemi Ekle:</h3>
