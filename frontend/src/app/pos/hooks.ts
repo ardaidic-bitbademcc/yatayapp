@@ -242,33 +242,43 @@ export function usePaymentMethods() {
 export function usePayAndClose() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ order_id, method, amount, table_id }: { order_id: string, method: string, amount: number, table_id: string }) => {
+    mutationFn: async ({ order_id, method, amount, table_id, is_split }: { 
+      order_id: string; 
+      method: string; 
+      amount: number; 
+      table_id: string; 
+      is_split?: boolean;
+    }) => {
       // ödeme kaydı
       const { error: payErr } = await supabase.from('payments').insert([{ order_id, method, amount }]);
       if (payErr) throw new Error(payErr.message);
-      // siparişi kapat
-      const { error: updErr } = await supabase.from('orders').update({ status: 'paid', closed_at: new Date().toISOString() }).eq('id', order_id);
-      if (updErr) throw new Error(updErr.message);
-      // masa boşalt
-      await supabase.from('tables').update({ status: 'empty' }).eq('id', table_id);
-      // order_items -> sales aktar (dashboard için)
-      const { data: orderItems, error: oiErr } = await supabase.from('order_items').select('*').eq('order_id', order_id);
-      if (oiErr) throw new Error(oiErr.message);
-      if (orderItems && orderItems.length) {
-        // Önceden eklenmiş mi kontrol (aynı order_id ile satırlar var mı?)
-        const { data: existingSales } = await supabase.from('sales').select('id').eq('order_id', order_id).limit(1);
-        if (!existingSales || existingSales.length === 0) {
-          const salesPayload = orderItems.map(oi => ({
-            amount: oi.unit_price, // birim fiyat
-            quantity: oi.quantity,
-            product_name: oi.product_name,
-            product_id: oi.product_id,
-            description: `Masa siparişi #${table_id}`,
-            status: 'completed',
-            order_id
-          }));
-          const { error: salesErr } = await supabase.from('sales').insert(salesPayload);
-          if (salesErr) throw new Error(salesErr.message);
+      
+      // Bölünmüş ödemede sadece ilk çağrıda siparişi kapat
+      if (!is_split) {
+        // siparişi kapat
+        const { error: updErr } = await supabase.from('orders').update({ status: 'paid', closed_at: new Date().toISOString() }).eq('id', order_id);
+        if (updErr) throw new Error(updErr.message);
+        // masa boşalt
+        await supabase.from('tables').update({ status: 'empty' }).eq('id', table_id);
+        // order_items -> sales aktar (dashboard için)
+        const { data: orderItems, error: oiErr } = await supabase.from('order_items').select('*').eq('order_id', order_id);
+        if (oiErr) throw new Error(oiErr.message);
+        if (orderItems && orderItems.length) {
+          // Önceden eklenmiş mi kontrol (aynı order_id ile satırlar var mı?)
+          const { data: existingSales } = await supabase.from('sales').select('id').eq('order_id', order_id).limit(1);
+          if (!existingSales || existingSales.length === 0) {
+            const salesPayload = orderItems.map(oi => ({
+              amount: oi.unit_price, // birim fiyat
+              quantity: oi.quantity,
+              product_name: oi.product_name,
+              product_id: oi.product_id,
+              description: `Masa siparişi #${table_id}`,
+              status: 'completed',
+              order_id
+            }));
+            const { error: salesErr } = await supabase.from('sales').insert(salesPayload);
+            if (salesErr) throw new Error(salesErr.message);
+          }
         }
       }
     },
