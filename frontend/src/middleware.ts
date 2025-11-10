@@ -65,12 +65,10 @@ export async function middleware(req: NextRequest) {
   // Cookie value'yu parse et (base64-url-encoded JSON)
   let accessToken: string | null = null;
   try {
-      console.log('Middleware: auth cookie value', cookies[authCookieKey]);
-    const authData = JSON.parse(decodeURIComponent(cookies[authCookieKey]));
-    accessToken = authData?.access_token || null;
+    console.log('Middleware: auth cookie value', cookies[authCookieKey]);
+    accessToken = decodeURIComponent(cookies[authCookieKey]);
   } catch (e) {
-      console.error('Middleware: auth cookie parse hatası', e);
-    console.error('Failed to parse auth cookie:', e);
+    console.error('Middleware: auth cookie parse hatası', e);
   }
 
   if (!accessToken) {
