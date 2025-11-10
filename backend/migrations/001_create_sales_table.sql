@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS public.sales (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz DEFAULT now(),
     amount numeric NOT NULL,
+    quantity integer DEFAULT 1,
     product_name text NOT NULL,
     product_id uuid REFERENCES public.products(id) ON DELETE SET NULL,
     personnel_id uuid REFERENCES public.personnel(id) ON DELETE SET NULL,
