@@ -8,8 +8,9 @@ import { supabase } from '@/lib/supabaseClient';
 import * as Sentry from '@sentry/nextjs';
 
 export default function HomePage() {
-  const [stats, setStats] = useState({ sales: 0, products: 0, personnel: 0, branches: 0 });
+  const [stats, setStats] = useState({ sales: 0, products: 0, personnel: 0, branches: 0, totalAmount: 0 });
   const [loading, setLoading] = useState(false);
+  const [recentSales, setRecentSales] = useState([]);
 
   const testSentryError = () => {
     try {
@@ -24,18 +25,23 @@ export default function HomePage() {
   useEffect(() => {
     async function fetchStats() {
       setLoading(true);
-      const [{ count: sales }, { count: products }, { count: personnel }, { count: branches }] = await Promise.all([
+      const [salesRes, productsRes, personnelRes, branchesRes, totalRes, recentRes] = await Promise.all([
         supabase.from('sales').select('*', { count: 'exact', head: true }),
         supabase.from('products').select('*', { count: 'exact', head: true }),
         supabase.from('personnel').select('*', { count: 'exact', head: true }),
-        supabase.from('branches').select('*', { count: 'exact', head: true })
+        supabase.from('branches').select('*', { count: 'exact', head: true }),
+        supabase.from('sales').select('amount'),
+        supabase.from('sales').select('created_at,amount,product_name,description').order('created_at', { ascending: false }).limit(5)
       ]);
+      const totalAmount = (totalRes.data || []).reduce((sum, s) => sum + Number(s.amount || 0), 0);
       setStats({
-        sales: sales ?? 0,
-        products: products ?? 0,
-        personnel: personnel ?? 0,
-        branches: branches ?? 0
+        sales: salesRes.count ?? 0,
+        products: productsRes.count ?? 0,
+        personnel: personnelRes.count ?? 0,
+        branches: branchesRes.count ?? 0,
+        totalAmount
       });
+      setRecentSales(recentRes.data || []);
       setLoading(false);
     }
     fetchStats();
@@ -45,7 +51,54 @@ export default function HomePage() {
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-4xl font-extrabold mb-8" role="heading" aria-level={1}>YatayApp</h1>
-        
+
+        {/* KPI Kartları */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded shadow p-6 flex flex-col items-center">
+            <div className="text-2xl font-bold text-indigo-700">{stats.sales}</div>
+            <div className="text-xs text-neutral-500 mt-2">Toplam Satış</div>
+          </div>
+          <div className="bg-white rounded shadow p-6 flex flex-col items-center">
+            <div className="text-2xl font-bold text-green-700">{stats.totalAmount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</div>
+            <div className="text-xs text-neutral-500 mt-2">Satış Tutarı</div>
+          </div>
+          <div className="bg-white rounded shadow p-6 flex flex-col items-center">
+            <div className="text-2xl font-bold text-blue-700">{stats.personnel}</div>
+            <div className="text-xs text-neutral-500 mt-2">Personel</div>
+          </div>
+          <div className="bg-white rounded shadow p-6 flex flex-col items-center">
+            <div className="text-2xl font-bold text-pink-700">{stats.branches}</div>
+            <div className="text-xs text-neutral-500 mt-2">Şube</div>
+          </div>
+        </div>
+
+        {/* Son Satışlar Tablosu */}
+        <div className="bg-white rounded shadow p-6 mb-8">
+          <h2 className="text-lg font-bold mb-4">Son Satışlar</h2>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="py-2 text-left">Tarih</th>
+                <th className="py-2 text-left">Ürün</th>
+                <th className="py-2 text-right">Tutar</th>
+                <th className="py-2 text-left">Açıklama</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentSales.length === 0 ? (
+                <tr><td colSpan={4} className="py-4 text-center text-neutral-400">Kayıt yok</td></tr>
+              ) : recentSales.map(sale => (
+                <tr key={sale.created_at} className="border-b">
+                  <td className="py-2">{new Date(sale.created_at).toLocaleString('tr-TR')}</td>
+                  <td className="py-2">{sale.product_name}</td>
+                  <td className="py-2 text-right">{Number(sale.amount).toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</td>
+                  <td className="py-2">{sale.description}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
         {process.env.NEXT_PUBLIC_SENTRY_DSN && (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
             <p className="text-xs text-yellow-800 mb-2">Sentry aktif (geliştirme/test modu)</p>
@@ -54,10 +107,6 @@ export default function HomePage() {
             </Button>
           </div>
         )}
-
-        {/* ...modül kartları... */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {/* ...modül kartları kodu değişmedi... */}
           <Link href="/pos">
             <div className="bg-white border-2 border-transparent hover:border-primary rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg">
               <div className="text-3xl mb-3">🛒</div>
