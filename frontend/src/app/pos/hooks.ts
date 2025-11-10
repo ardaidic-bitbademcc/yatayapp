@@ -6,8 +6,10 @@ const SALES_KEY = ['sales'];
 export interface Sale {
   id: number;
   product_id?: number;
+  product_name?: string;
+  amount?: number; // Birim fiyat
   quantity: number;
-  total: number;
+  total?: number; // Computed column - read-only (amount * quantity)
   created_at?: string;
 }
 
@@ -27,7 +29,7 @@ export function useSales() {
 export function useCreateSale() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (newSale: Omit<Sale, 'id'>) => {
+    mutationFn: async (newSale: Omit<Sale, 'id' | 'total'>) => {
       const { data, error } = await supabase.from('sales').insert([newSale]).select();
       if (error) throw new Error(error.message);
       return data;

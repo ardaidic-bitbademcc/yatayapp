@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS public.sales (
     status text DEFAULT 'completed'
 );
 
--- Örnek seed veri
-INSERT INTO public.sales (amount, product_name, description, status)
+-- Örnek seed veri (total otomatik hesaplanacak)
+INSERT INTO public.sales (amount, quantity, product_name, description, status)
 VALUES
-  (100, 'Kahve', 'Vezne satış', 'completed'),
-  (250, 'Sandviç', 'POS satış', 'completed');
+  (100, 1, 'Kahve', 'Vezne satış', 'completed'),
+  (250, 2, 'Sandviç', 'POS satış', 'completed');

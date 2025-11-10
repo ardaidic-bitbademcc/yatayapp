@@ -25,10 +25,14 @@ export default function PosPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const product = products.find(p => p.id === Number(form.product_id));
+    if (!product) return;
+    
     const saleData = {
       product_id: Number(form.product_id),
-      quantity: Number(form.quantity),
-      total: product ? product.price * Number(form.quantity) : 0
+      product_name: product.name,
+      amount: product.price, // Birim fiyat
+      quantity: Number(form.quantity)
+      // total otomatik hesaplanacak (amount * quantity)
     };
     await createMutation.mutateAsync(saleData);
     setForm({ product_id: '', quantity: 1 });
