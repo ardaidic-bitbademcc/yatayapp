@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import * as Sentry from '@sentry/nextjs';
+import AttendanceWidget from '@/components/AttendanceWidget';
 
 export default function HomePage() {
   const [stats, setStats] = useState({ sales: 0, products: 0, personnel: 0, branches: 0, totalAmount: 0 });
@@ -70,6 +71,11 @@ export default function HomePage() {
             <div className="text-2xl font-bold text-pink-700">{stats.branches}</div>
             <div className="text-xs text-neutral-500 mt-2">Şube</div>
           </div>
+        </div>
+
+        {/* Giriş-Çıkış Widget */}
+        <div className="mb-8">
+          <AttendanceWidget />
         </div>
 
         {/* Son Satışlar Tablosu */}
