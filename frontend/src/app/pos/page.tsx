@@ -5,6 +5,27 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useProducts } from '../menu/hooks';
+import { supabase } from '@/lib/supabaseClient';
+import {
+  useZones,
+  useTables,
+  useEnsureOpenOrder,
+  useOrderItems,
+  useAddItem,
+  useUpdateItemQty,
+  useRemoveItem,
+  usePaymentMethods,
+  usePayAndClose,
+} from './hooks';
+
+// @ts-nocheck
+"use client";
+
+import { useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { useProducts } from '../menu/hooks';
+import { supabase } from '@/lib/supabaseClient';
 import {
   useZones,
   useTables,
@@ -30,19 +51,58 @@ export default function PosPage() {
   const removeItem = useRemoveItem();
   const { data: paymentMethods = [] } = usePaymentMethods();
   const payAndClose = usePayAndClose();
+  const [pending, setPending] = useState<any[]>([]);
 
   const { data: items = [] } = useOrderItems(order?.id);
   const total = useMemo(() => items.reduce((s, it) => s + Number(it.line_total || 0), 0), [items]);
 
   const onSelectTable = async (t: any) => {
     setSelectedTable(t);
-    const ord = await ensureOrder.mutateAsync(t.id);
-    setOrder(ord);
+    setPending([]);
+    const { data: existing, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('table_id', t.id)
+      .eq('status', 'open')
+      .limit(1)
+      .maybeSingle();
+    if (!error) setOrder(existing || null);
+    else setOrder(null);
   };
 
   const onAddProduct = async (p: any) => {
-    if (!order) return;
-    await addItem.mutateAsync({ order_id: order.id, product: p });
+    if (!selectedTable) return;
+    setPending(prev => {
+      const idx = prev.findIndex(x => x.product.id === p.id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = { ...copy[idx], quantity: copy[idx].quantity + 1 };
+        return copy;
+      }
+      return [...prev, { product: p, quantity: 1 }];
+    });
+  };
+
+  const decPending = (id: any) => {
+    setPending(prev => prev
+      .flatMap(x => x.product.id === id ? [{ ...x, quantity: Math.max(0, x.quantity - 1) }] : [x])
+      .filter(x => x.quantity > 0));
+  };
+  const incPending = (id: any) => {
+    setPending(prev => prev.map(x => x.product.id === id ? { ...x, quantity: x.quantity + 1 } : x));
+  };
+
+  const saveToTable = async () => {
+    if (!selectedTable || pending.length === 0) return;
+    let ord = order;
+    if (!ord) {
+      ord = await ensureOrder.mutateAsync(selectedTable.id);
+      setOrder(ord);
+    }
+    for (const it of pending) {
+      await addItem.mutateAsync({ order_id: ord.id, product: it.product, quantity: it.quantity });
+    }
+    setPending([]);
   };
 
   const onPay = async (method: any) => {
@@ -65,7 +125,7 @@ export default function PosPage() {
         {zones.map(z => (
           <Button key={z.id} size="sm" variant={zoneId === z.id ? 'default' : 'outline'} onClick={() => setZoneId(z.id)}>{z.name}</Button>
         ))}
-  {zones.length === 0 && <span className="text-xs text-muted-foreground">Bölge yok. Ayarlar {'>'} Masa Yönetimi</span>}
+        {zones.length === 0 && <span className="text-xs text-muted-foreground">Bölge yok. Ayarlar {'>'} Masa Yönetimi</span>}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -99,12 +159,34 @@ export default function PosPage() {
 
         {/* Sepet/Ödeme */}
         <div className="xl:col-span-1 border rounded-lg p-4">
-          <h2 className="text-lg font-semibold mb-3">{selectedTable ? `${selectedTable.name} Sipariş` : 'Sepet'}</h2>
+          <h2 className="text-lg font-semibold mb-3">{selectedTable ? `${selectedTable.name} Sepet/Sipariş` : 'Sepet'}</h2>
           {!selectedTable && (
             <div className="text-sm text-muted-foreground">Masa seçiniz.</div>
           )}
           {selectedTable && (
             <div>
+              {pending.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="font-medium mb-2">Bekleyen (kaydetmeden):</h3>
+                  <ul className="divide-y">
+                    {pending.map(it => (
+                      <li key={it.product.id} className="py-2 flex items-center justify-between gap-2">
+                        <div>
+                          <div className="font-medium">{it.product.name}</div>
+                          <div className="text-xs text-muted-foreground">₺{it.product.price} x {it.quantity}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button size="icon" variant="outline" onClick={() => decPending(it.product.id)}> - </Button>
+                          <span className="w-6 text-center text-sm">{it.quantity}</span>
+                          <Button size="icon" variant="outline" onClick={() => incPending(it.product.id)}> + </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button className="mt-3 w-full" onClick={saveToTable}>Masaya Kaydet</Button>
+                </div>
+              )}
+
               <ul className="divide-y">
                 {items.map((it: any) => (
                   <li key={it.id} className="py-2 flex items-center justify-between gap-2">
@@ -120,7 +202,7 @@ export default function PosPage() {
                     </div>
                   </li>
                 ))}
-                {items.length === 0 && <li className="py-6 text-sm text-muted-foreground">Sepet boş</li>}
+                {items.length === 0 && <li className="py-6 text-sm text-muted-foreground">Kaydedilmiş kalem yok</li>}
               </ul>
 
               <div className="mt-4 flex items-center justify-between">
@@ -128,14 +210,19 @@ export default function PosPage() {
                 <div className="text-xl font-bold">{total.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</div>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {paymentMethods.map(pm => (
-                  <Button key={pm.id} style={{ backgroundColor: pm.color || undefined }} onClick={() => onPay(pm)} disabled={items.length === 0}>
-                    {pm.name}
-                  </Button>
-                ))}
-                {paymentMethods.length === 0 && <div className="text-xs text-muted-foreground">Ödeme yöntemi yok. Ayarlar {'>'} Ödeme Yöntemleri</div>}
-              </div>
+              {pending.length === 0 && items.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="font-medium mb-2">Ödeme Al</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {paymentMethods.map(pm => (
+                      <Button key={pm.id} style={{ backgroundColor: pm.color || undefined }} onClick={() => onPay(pm)}>
+                        {pm.name}
+                      </Button>
+                    ))}
+                  </div>
+                  {paymentMethods.length === 0 && <div className="text-xs text-muted-foreground mt-2">Ödeme yöntemi yok. Ayarlar {'>'} Ödeme Yöntemleri</div>}
+                </div>
+              )}
             </div>
           )}
         </div>

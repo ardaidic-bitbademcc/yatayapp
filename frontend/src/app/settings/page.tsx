@@ -8,6 +8,11 @@ export default function SettingsPage() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Ayarlar</h1>
         <p className="text-muted-foreground">Sistem ayarları ve yönetim araçları</p>
+        <div className="mt-3">
+          <Link href="/">
+            <Button variant="ghost" size="sm">← Ana sayfa</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-6">
@@ -20,7 +25,7 @@ export default function SettingsPage() {
                 <h3 className="font-medium">Personel PIN Ayarla</h3>
                 <p className="text-sm text-muted-foreground">Personel giriş/çıkış için PIN oluştur</p>
               </div>
-              <Link href="/api/admin/set-pin">
+              <Link href="/settings/pin">
                 <Button variant="outline" size="sm">Yönet</Button>
               </Link>
             </div>
@@ -126,6 +131,7 @@ function TableManagementSettings() {
   const [tables, setTables] = useState<any[]>([]);
   const [zoneForm, setZoneForm] = useState({ name: '' });
   const [tableForm, setTableForm] = useState({ name: '', capacity: 4 });
+  const [bulk, setBulk] = useState({ prefix: 'M', start: 1, count: 10, capacity: 4 });
   const [selectedZone, setSelectedZone] = useState<string | undefined>(undefined);
 
   const loadZones = async () => {
@@ -161,6 +167,18 @@ function TableManagementSettings() {
     setTableForm({ name: '', capacity: 4 });
     await loadTables(selectedZone);
   };
+  const addBulkTables = async (e: any) => {
+    e.preventDefault();
+    if (!selectedZone) return;
+    const rows = Array.from({ length: Math.max(0, Number(bulk.count) || 0) }).map((_, i) => ({
+      name: `${bulk.prefix}${Number(bulk.start) + i}`,
+      capacity: Number(bulk.capacity) || 4,
+      zone_id: selectedZone
+    }));
+    if (rows.length === 0) return;
+    await supabase.from('tables').insert(rows);
+    await loadTables(selectedZone);
+  };
   const rmTable = async (id: string) => {
     await supabase.from('tables').delete().eq('id', id);
     await loadTables(selectedZone);
@@ -192,6 +210,14 @@ function TableManagementSettings() {
             <input value={tableForm.name} onChange={e=>setTableForm(f=>({ ...f, name: e.target.value }))} placeholder="Masa adı" className="border rounded px-2 py-1 w-full" required disabled={!selectedZone} />
             <input type="number" value={tableForm.capacity} onChange={e=>setTableForm(f=>({ ...f, capacity: Number(e.target.value) }))} className="border rounded px-2 py-1 w-24" placeholder="Kişi" disabled={!selectedZone} />
             <Button type="submit" size="sm" disabled={!selectedZone}>Ekle</Button>
+          </form>
+          <form onSubmit={addBulkTables} className="flex flex-wrap gap-2 mb-4 items-center">
+            <span className="text-xs text-muted-foreground">Toplu ekle:</span>
+            <input value={bulk.prefix} onChange={e=>setBulk(b=>({ ...b, prefix: e.target.value }))} placeholder="Önek" className="border rounded px-2 py-1 w-24" disabled={!selectedZone} />
+            <input type="number" value={bulk.start} onChange={e=>setBulk(b=>({ ...b, start: Number(e.target.value) }))} placeholder="Başlangıç" className="border rounded px-2 py-1 w-28" disabled={!selectedZone} />
+            <input type="number" value={bulk.count} onChange={e=>setBulk(b=>({ ...b, count: Number(e.target.value) }))} placeholder="Adet" className="border rounded px-2 py-1 w-24" disabled={!selectedZone} />
+            <input type="number" value={bulk.capacity} onChange={e=>setBulk(b=>({ ...b, capacity: Number(e.target.value) }))} placeholder="Kişi" className="border rounded px-2 py-1 w-24" disabled={!selectedZone} />
+            <Button type="submit" size="sm" variant="outline" disabled={!selectedZone}>Toplu Oluştur</Button>
           </form>
           <ul className="space-y-1">
             {tables.map(t => (

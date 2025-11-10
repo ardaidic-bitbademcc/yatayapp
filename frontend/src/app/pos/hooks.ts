@@ -11,6 +11,7 @@ export interface Sale {
   quantity: number;
   total?: number; // Computed column - read-only (amount * quantity)
   created_at?: string;
+  order_id?: string;
 }
 
 // Fetch all sales
@@ -178,13 +179,13 @@ export function useOrderItems(orderId?: string) {
 export function useAddItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ order_id, product }: { order_id: string, product: any }) => {
+    mutationFn: async ({ order_id, product, quantity = 1 }: { order_id: string, product: any, quantity?: number }) => {
       const payload = {
         order_id,
         product_id: product.id,
         product_name: product.name,
         unit_price: product.price,
-        quantity: 1,
+        quantity,
       };
       const { data, error } = await supabase.from('order_items').insert([payload]).select();
       if (error) throw new Error(error.message);
@@ -250,10 +251,31 @@ export function usePayAndClose() {
       if (updErr) throw new Error(updErr.message);
       // masa boşalt
       await supabase.from('tables').update({ status: 'empty' }).eq('id', table_id);
+      // order_items -> sales aktar (dashboard için)
+      const { data: orderItems, error: oiErr } = await supabase.from('order_items').select('*').eq('order_id', order_id);
+      if (oiErr) throw new Error(oiErr.message);
+      if (orderItems && orderItems.length) {
+        // Önceden eklenmiş mi kontrol (aynı order_id ile satırlar var mı?)
+        const { data: existingSales } = await supabase.from('sales').select('id').eq('order_id', order_id).limit(1);
+        if (!existingSales || existingSales.length === 0) {
+          const salesPayload = orderItems.map(oi => ({
+            amount: oi.unit_price, // birim fiyat
+            quantity: oi.quantity,
+            product_name: oi.product_name,
+            product_id: oi.product_id,
+            description: `Masa siparişi #${table_id}`,
+            status: 'completed',
+            order_id
+          }));
+          const { error: salesErr } = await supabase.from('sales').insert(salesPayload);
+          if (salesErr) throw new Error(salesErr.message);
+        }
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['orders'] });
       qc.invalidateQueries({ queryKey: ['tables'] });
+      qc.invalidateQueries({ queryKey: SALES_KEY });
     }
   });
 }
