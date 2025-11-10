@@ -50,9 +50,8 @@ export async function middleware(req: NextRequest) {
     console.log('Middleware: parsed cookies', cookies);
 
   // Supabase auth cookie pattern: sb-{project-ref}-auth-token
-  const authCookieKey = Object.keys(cookies).find(key => 
-    key.startsWith('sb-') && key.endsWith('-auth-token')
-  );
+  // Yeni: sb-access-token cookie'sini kullan
+  const authCookieKey = 'sb-access-token';
 
     console.log('Middleware: authCookieKey', authCookieKey);
 

@@ -43,7 +43,9 @@ function LoginForm() {
       setLoading(false);
     } else if (data.session) {
       // Hard redirect ile cookie'lerin browser'da set olmasını sağla
-      window.location.href = redirect;
+        // Supabase session access_token'ı cookie olarak yaz
+        document.cookie = `sb-access-token=${data.session.access_token}; path=/; secure; samesite=strict; max-age=604800`;
+        window.location.href = redirect;
     }
   };
 
