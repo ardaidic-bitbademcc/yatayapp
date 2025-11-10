@@ -9,7 +9,7 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(false);
 
   // Simple PIN-based check-in (MVP): client posts PIN and personnel id is resolved server-side
-  const handlePin = async (e) => {
+  const handlePin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
@@ -22,7 +22,7 @@ export default function AttendancePage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Check-in failed');
       setMessage('Giriş başarılı');
-    } catch (err:any) {
+    } catch (err: any) {
       setMessage('Hata: ' + err.message);
     } finally {
       setLoading(false);
@@ -39,8 +39,8 @@ export default function AttendancePage() {
       <div className="mb-6">
         <h2 className="font-semibold mb-2">PIN ile Giriş</h2>
         <form onSubmit={handlePin} className="space-y-2">
-          <input type="password" value={pin} onChange={e => setPin(e.target.value)} placeholder="4 haneli PIN" className="w-full px-3 py-2 border rounded" />
-          <button className="w-full bg-indigo-600 text-white px-3 py-2 rounded" disabled={loading}>{loading ? '...' : 'Giriş Yap'}</button>
+          <input type="password" value={pin} onChange={e => setPin(e.target.value)} placeholder="4 haneli PIN" className="w-full px-3 py-2 border rounded" required />
+          <button type="submit" className="w-full bg-indigo-600 text-white px-3 py-2 rounded" disabled={loading}>{loading ? '...' : 'Giriş Yap'}</button>
         </form>
       </div>
 
