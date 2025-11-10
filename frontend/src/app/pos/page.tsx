@@ -1,25 +1,5 @@
-// @ts-nocheck
 "use client";
-
-import { useMemo, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { useProducts } from '../menu/hooks';
-import { supabase } from '@/lib/supabaseClient';
-import {
-  useZones,
-  useTables,
-  useEnsureOpenOrder,
-  useOrderItems,
-  useAddItem,
-  useUpdateItemQty,
-  useRemoveItem,
-  usePaymentMethods,
-  usePayAndClose,
-} from './hooks';
-
 // @ts-nocheck
-"use client";
 
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -176,9 +156,9 @@ export default function PosPage() {
                           <div className="text-xs text-muted-foreground">₺{it.product.price} x {it.quantity}</div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button size="icon" variant="outline" onClick={() => decPending(it.product.id)}> - </Button>
+                          <Button size="sm" variant="outline" onClick={() => decPending(it.product.id)}> - </Button>
                           <span className="w-6 text-center text-sm">{it.quantity}</span>
-                          <Button size="icon" variant="outline" onClick={() => incPending(it.product.id)}> + </Button>
+                          <Button size="sm" variant="outline" onClick={() => incPending(it.product.id)}> + </Button>
                         </div>
                       </li>
                     ))}
@@ -195,10 +175,10 @@ export default function PosPage() {
                       <div className="text-xs text-muted-foreground">₺{it.unit_price} x {it.quantity}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button size="icon" variant="outline" onClick={() => updateQty.mutate({ id: it.id, quantity: Math.max(1, it.quantity - 1), order_id: order.id })}>-</Button>
+                      <Button size="sm" variant="outline" onClick={() => updateQty.mutate({ id: it.id, quantity: Math.max(1, it.quantity - 1), order_id: order.id })}>-</Button>
                       <span className="w-6 text-center text-sm">{it.quantity}</span>
-                      <Button size="icon" variant="outline" onClick={() => updateQty.mutate({ id: it.id, quantity: it.quantity + 1, order_id: order.id })}>+</Button>
-                      <Button size="icon" variant="destructive" onClick={() => removeItem.mutate({ id: it.id, order_id: order.id })}>✕</Button>
+                      <Button size="sm" variant="outline" onClick={() => updateQty.mutate({ id: it.id, quantity: it.quantity + 1, order_id: order.id })}>+</Button>
+                      <Button size="sm" variant="destructive" onClick={() => removeItem.mutate({ id: it.id, order_id: order.id })}>✕</Button>
                     </div>
                   </li>
                 ))}
