@@ -35,20 +35,44 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Supabase client (middleware'de anon key kullanılır)
-  const supabase = createClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      global: {
-        headers: {
-          cookie: req.headers.get('cookie') || ''
-        }
-      }
-    }
+  // Cookie'den access token'ı oku
+  const cookieHeader = req.headers.get('cookie') || '';
+  const cookies = Object.fromEntries(
+    cookieHeader.split(';').map(c => {
+      const [key, ...v] = c.trim().split('=');
+      return [key, v.join('=')];
+    })
   );
 
-  const { data: { user }, error } = await supabase.auth.getUser();
+  // Supabase auth cookie pattern: sb-{project-ref}-auth-token
+  const authCookieKey = Object.keys(cookies).find(key => 
+    key.startsWith('sb-') && key.endsWith('-auth-token')
+  );
+
+  if (!authCookieKey || !cookies[authCookieKey]) {
+    const loginUrl = new URL('/login', req.url);
+    loginUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Cookie value'yu parse et (base64-url-encoded JSON)
+  let accessToken: string | null = null;
+  try {
+    const authData = JSON.parse(decodeURIComponent(cookies[authCookieKey]));
+    accessToken = authData?.access_token || null;
+  } catch (e) {
+    console.error('Failed to parse auth cookie:', e);
+  }
+
+  if (!accessToken) {
+    const loginUrl = new URL('/login', req.url);
+    loginUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Token ile Supabase user doğrula
+  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  const { data: { user }, error } = await supabase.auth.getUser(accessToken);
 
   if (error || !user) {
     const loginUrl = new URL('/login', req.url);
