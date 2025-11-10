@@ -166,6 +166,16 @@ export default function HomePage() {
               <Button size="sm" className="w-full" variant="outline">Raporla →</Button>
             </div>
           </Link>
+          <Link href="/reports">
+            <div className="bg-white border-2 border-transparent hover:border-primary rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg">
+              <div className="text-3xl mb-3">📊</div>
+              <h2 className="text-xl font-bold mb-2">Raporlar</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Satış, ödeme ve performans raporları
+              </p>
+              <Button size="sm" className="w-full" variant="outline">Görüntüle →</Button>
+            </div>
+          </Link>
           <Link href="/settings">
             <div className="bg-white border-2 border-transparent hover:border-primary rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg">
               <div className="text-3xl mb-3">⚙️</div>
