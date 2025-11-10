@@ -9,7 +9,16 @@ import * as Sentry from '@sentry/nextjs';
 import AttendanceWidget from '@/components/AttendanceWidget';
 
 export default function HomePage() {
-  const [stats, setStats] = useState({ sales: 0, products: 0, personnel: 0, branches: 0, totalAmount: 0 });
+  const [stats, setStats] = useState({ 
+    sales: 0, 
+    products: 0, 
+    personnel: 0, 
+    branches: 0, 
+    totalAmount: 0,
+    todayOrders: 0,
+    openTables: 0,
+    todayRevenue: 0
+  });
   const [loading, setLoading] = useState(false);
   const [recentSales, setRecentSales] = useState([]);
 
@@ -26,21 +35,45 @@ export default function HomePage() {
   useEffect(() => {
     async function fetchStats() {
       setLoading(true);
-      const [salesRes, productsRes, personnelRes, branchesRes, totalRes, recentRes] = await Promise.all([
+      
+      // Bugünün başlangıcı
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const [
+        salesRes, 
+        productsRes, 
+        personnelRes, 
+        branchesRes, 
+        totalRes, 
+        recentRes,
+        todayOrdersRes,
+        openTablesRes,
+        todaySalesRes
+      ] = await Promise.all([
         supabase.from('sales').select('*', { count: 'exact', head: true }),
         supabase.from('products').select('*', { count: 'exact', head: true }),
         supabase.from('personnel').select('*', { count: 'exact', head: true }),
         supabase.from('branches').select('*', { count: 'exact', head: true }),
-        supabase.from('sales').select('amount'),
-        supabase.from('sales').select('created_at,amount,product_name,description').order('created_at', { ascending: false }).limit(5)
+        supabase.from('sales').select('amount,total_amount'),
+        supabase.from('sales').select('created_at,amount,total_amount,product_name,description').order('created_at', { ascending: false }).limit(5),
+        supabase.from('orders').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
+        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+        supabase.from('sales').select('total_amount').gte('created_at', today.toISOString())
       ]);
-      const totalAmount = (totalRes.data || []).reduce((sum, s) => sum + Number(s.amount || 0), 0);
+      
+      const totalAmount = (totalRes.data || []).reduce((sum, s) => sum + Number(s.total_amount || s.amount || 0), 0);
+      const todayRevenue = (todaySalesRes.data || []).reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
+      
       setStats({
         sales: salesRes.count ?? 0,
         products: productsRes.count ?? 0,
         personnel: personnelRes.count ?? 0,
         branches: branchesRes.count ?? 0,
-        totalAmount
+        totalAmount,
+        todayOrders: todayOrdersRes.count ?? 0,
+        openTables: openTablesRes.count ?? 0,
+        todayRevenue
       });
       setRecentSales(recentRes.data || []);
       setLoading(false);
@@ -61,11 +94,27 @@ export default function HomePage() {
           </div>
           <div className="bg-white rounded shadow p-6 flex flex-col items-center">
             <div className="text-2xl font-bold text-green-700">{stats.totalAmount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</div>
-            <div className="text-xs text-neutral-500 mt-2">Satış Tutarı</div>
+            <div className="text-xs text-neutral-500 mt-2">Toplam Ciro</div>
+          </div>
+          <div className="bg-white rounded shadow p-6 flex flex-col items-center">
+            <div className="text-2xl font-bold text-orange-700">{stats.todayOrders}</div>
+            <div className="text-xs text-neutral-500 mt-2">Bugünkü Sipariş</div>
+          </div>
+          <div className="bg-white rounded shadow p-6 flex flex-col items-center">
+            <div className="text-2xl font-bold text-cyan-700">{stats.openTables}</div>
+            <div className="text-xs text-neutral-500 mt-2">Açık Masa</div>
+          </div>
+          <div className="bg-white rounded shadow p-6 flex flex-col items-center">
+            <div className="text-2xl font-bold text-emerald-700">{stats.todayRevenue.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</div>
+            <div className="text-xs text-neutral-500 mt-2">Bugünkü Ciro</div>
           </div>
           <div className="bg-white rounded shadow p-6 flex flex-col items-center">
             <div className="text-2xl font-bold text-blue-700">{stats.personnel}</div>
             <div className="text-xs text-neutral-500 mt-2">Personel</div>
+          </div>
+          <div className="bg-white rounded shadow p-6 flex flex-col items-center">
+            <div className="text-2xl font-bold text-purple-700">{stats.products}</div>
+            <div className="text-xs text-neutral-500 mt-2">Ürün</div>
           </div>
           <div className="bg-white rounded shadow p-6 flex flex-col items-center">
             <div className="text-2xl font-bold text-pink-700">{stats.branches}</div>
