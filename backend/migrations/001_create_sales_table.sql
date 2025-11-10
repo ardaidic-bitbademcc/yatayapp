@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS public.sales (
     created_at timestamptz DEFAULT now(),
     amount numeric NOT NULL,
     quantity integer DEFAULT 1,
+    total numeric GENERATED ALWAYS AS (amount * quantity) STORED,
     product_name text NOT NULL,
     product_id uuid REFERENCES public.products(id) ON DELETE SET NULL,
     personnel_id uuid REFERENCES public.personnel(id) ON DELETE SET NULL,
