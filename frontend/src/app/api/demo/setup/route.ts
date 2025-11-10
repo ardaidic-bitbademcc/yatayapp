@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
 import { createClient } from '@supabase/supabase-js';
 
 // Demo veri ve demo kullanıcı oluşturma endpoint'i.
@@ -10,15 +9,22 @@ export async function POST() {
     return NextResponse.json({ error: 'Demo modu kapalı' }, { status: 403 });
   }
 
-  // Supabase client seçimi: Servis rolü varsa onu kullan, yoksa anon client ile devam et
-  const useServiceRole = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const db = useServiceRole
-    ? createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { auth: { autoRefreshToken: false, persistSession: false } }
-      )
-    : supabase;
+  // Supabase client: Runtime'da oluştur, build-time değil
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl) {
+    return NextResponse.json({ error: 'Supabase URL eksik' }, { status: 500 });
+  }
+
+  const db = serviceRoleKey
+    ? createClient(supabaseUrl, serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+      })
+    : createClient(supabaseUrl, anonKey!, {
+        auth: { autoRefreshToken: false, persistSession: false }
+      });
 
   // Basit kontrol: zaten bir ürün varsa tekrar ekleme yapma.
   const { data: existingProducts } = await db.from('products').select('id').limit(1);
