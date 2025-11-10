@@ -21,7 +21,15 @@ function LoginForm() {
     setLoading(true);
     setError(null);
     setInfo(null);
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    const redirectUrl = typeof window !== 'undefined' 
+      ? `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`
+      : undefined;
+    const { error } = await supabase.auth.signInWithOtp({ 
+      email,
+      options: {
+        emailRedirectTo: redirectUrl
+      }
+    });
     if (error) setError(error.message);
     else setInfo("Giriş linki e-posta adresinize gönderildi.");
     setLoading(false);
