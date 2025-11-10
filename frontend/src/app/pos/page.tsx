@@ -35,6 +35,7 @@ export default function PosPage() {
   const [showSplitPayment, setShowSplitPayment] = useState(false);
   const [splitPayments, setSplitPayments] = useState<{ method_id: string; method_name: string; amount: number }[]>([]);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false); // Adisyon (receipt) modal state
 
   const { data: items = [] } = useOrderItems(order?.id);
   const total = useMemo(() => items.reduce((s, it) => s + Number(it.line_total || 0), 0), [items]);
@@ -239,6 +240,22 @@ export default function PosPage() {
     setShowCancelConfirm(false);
   };
 
+  // Adisyon Yazdırma UI Fonksiyonları
+  const openReceipt = () => setShowReceipt(true);
+  const closeReceipt = () => setShowReceipt(false);
+  const printReceipt = () => {
+    if (!selectedTable) return;
+    // Printer entegrasyonu ileride buraya gelecek. Şimdilik stub.
+    console.log('[PRINTER_STUB] Adisyon yazdırılıyor:', {
+      table: selectedTable?.name,
+      order_id: order?.id,
+      saved_items: items.map((it: any) => ({ id: it.id, name: it.product_name, qty: it.quantity, unit: it.unit_price, line_total: it.line_total })),
+      pending_items: pending.map(it => ({ name: it.product.name, qty: it.quantity, unit: it.product.price, line_total: it.quantity * it.product.price })),
+      total: total
+    });
+    closeReceipt();
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -360,13 +377,70 @@ export default function PosPage() {
                       </Button>
                     ))}
                   </div>
-                  <Button variant="outline" className="w-full mt-2" onClick={onSplitPayment}>
-                    Bölünmüş Ödeme
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <Button variant="outline" onClick={onSplitPayment}>
+                      Bölünmüş Ödeme
+                    </Button>
+                    <Button variant="outline" onClick={openReceipt}>
+                      Adisyon Yazdır
+                    </Button>
+                  </div>
                   <Button variant="destructive" className="w-full mt-2" onClick={onCancelOrder}>
                     Siparişi İptal Et
                   </Button>
                   {paymentMethods.length === 0 && <div className="text-xs text-muted-foreground mt-2">Ödeme yöntemi yok. Ayarlar {'>'} Ödeme Yöntemleri</div>}
+                </div>
+              )}
+              {/* Receipt (Adisyon) Modal */}
+              {showReceipt && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                    <h2 className="text-xl font-bold mb-4">Adisyon Önizleme</h2>
+                    <div className="text-sm mb-3 flex justify-between">
+                      <span className="text-muted-foreground">Masa:</span>
+                      <span className="font-medium">{selectedTable?.name}</span>
+                    </div>
+                    <div className="max-h-64 overflow-auto border rounded mb-4">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            <th className="text-left px-2 py-1">Ürün</th>
+                            <th className="text-right px-2 py-1">Adet</th>
+                            <th className="text-right px-2 py-1">Tutar</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {items.map((it: any) => (
+                            <tr key={it.id} className="border-t">
+                              <td className="px-2 py-1">{it.product_name}</td>
+                              <td className="px-2 py-1 text-right">{it.quantity}</td>
+                              <td className="px-2 py-1 text-right">{Number(it.line_total || it.unit_price * it.quantity).toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</td>
+                            </tr>
+                          ))}
+                          {pending.length > 0 && (
+                            <tr className="bg-yellow-50">
+                              <td className="px-2 py-1" colSpan={3}>Kaydedilmemiş (Bekleyen) Kalemler</td>
+                            </tr>
+                          )}
+                          {pending.map((p, idx) => (
+                            <tr key={`pending-${idx}`} className="border-t">
+                              <td className="px-2 py-1">{p.product.name}</td>
+                              <td className="px-2 py-1 text-right">{p.quantity}</td>
+                              <td className="px-2 py-1 text-right">{(p.quantity * p.product.price).toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-sm text-muted-foreground">Toplam</span>
+                      <span className="text-lg font-bold">{total.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button className="flex-1" onClick={printReceipt} disabled={items.length === 0 && pending.length === 0}>Yazdır (Stub)</Button>
+                      <Button variant="outline" onClick={closeReceipt}>Kapat</Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
