@@ -83,11 +83,27 @@ export default function PosPage() {
       await addItem.mutateAsync({ order_id: ord.id, product: it.product, quantity: it.quantity });
     }
     setPending([]);
+    
+    // Yazıcı tetikleme stub: ileride printer API entegrasyonu
+    console.log('[PRINTER_STUB] Sipariş kaydedildi, adisyon yazdırılabilir:', {
+      table: selectedTable.name,
+      order_id: ord.id,
+      items: pending.map(it => ({ name: it.product.name, qty: it.quantity }))
+    });
   };
 
   const onPay = async (method: any) => {
     if (!order || !selectedTable) return;
     await payAndClose.mutateAsync({ order_id: order.id, method: method.name, amount: total, table_id: selectedTable.id });
+    
+    // Yazıcı tetikleme stub: ileride printer API entegrasyonu
+    console.log('[PRINTER_STUB] Ödeme alındı, fiş yazdırılabilir:', {
+      table: selectedTable.name,
+      order_id: order.id,
+      method: method.name,
+      total: total
+    });
+    
     setOrder(null);
     setSelectedTable(null);
   };
