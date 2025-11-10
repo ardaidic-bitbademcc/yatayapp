@@ -43,6 +43,26 @@ CREATE TABLE IF NOT EXISTS personnel (
 );
 
 -- =============================
+-- Idempotent Column Additions (personnel tablosu için email ve phone)
+-- =============================
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'personnel' AND column_name = 'email'
+  ) THEN
+    ALTER TABLE personnel ADD COLUMN email varchar(255);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'personnel' AND column_name = 'phone'
+  ) THEN
+    ALTER TABLE personnel ADD COLUMN phone varchar(20);
+  END IF;
+END $$;
+
+-- =============================
 -- Trigger
 -- =============================
 CREATE TRIGGER trg_store_updated BEFORE UPDATE ON stores FOR EACH ROW EXECUTE FUNCTION set_updated_at();
