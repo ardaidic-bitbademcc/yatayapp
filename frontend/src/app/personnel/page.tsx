@@ -44,9 +44,14 @@ export default function PersonnelPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Personel Yönetimi</h1>
-        <p className="text-muted-foreground">Vardiya, puantaj ve maaş yönetimi</p>
+      <div className="mb-6 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Personel Yönetimi</h1>
+          <p className="text-muted-foreground">Vardiya, puantaj ve maaş yönetimi</p>
+        </div>
+        <Link href="/personnel/attendance">
+          <Button variant="outline">📍 Giriş/Çıkış Sistemi</Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

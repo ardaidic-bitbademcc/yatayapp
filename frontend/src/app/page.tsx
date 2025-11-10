@@ -160,14 +160,16 @@ export default function HomePage() {
               <Button size="sm" className="w-full" variant="outline">Raporla →</Button>
             </div>
           </Link>
-          <div className="bg-white border-2 border-transparent hover:border-primary rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg opacity-60">
-            <div className="text-3xl mb-3">⚙️</div>
-            <h2 className="text-xl font-bold mb-2">Ayarlar</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Sistem ayarları ve kullanıcı yönetimi
-            </p>
-            <Button size="sm" className="w-full" variant="ghost" disabled>Yakında</Button>
-          </div>
+          <Link href="/settings">
+            <div className="bg-white border-2 border-transparent hover:border-primary rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg">
+              <div className="text-3xl mb-3">⚙️</div>
+              <h2 className="text-xl font-bold mb-2">Ayarlar</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Sistem ayarları ve kullanıcı yönetimi
+              </p>
+              <Button size="sm" className="w-full" variant="outline">Yönet →</Button>
+            </div>
+          </Link>
         </div>
 
         {/* Hızlı İstatistikler */}

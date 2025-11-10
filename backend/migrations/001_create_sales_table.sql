@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS public.sales (
     created_at timestamptz DEFAULT now(),
     amount numeric NOT NULL,
     product_name text NOT NULL,
+    product_id uuid REFERENCES public.products(id) ON DELETE SET NULL,
     personnel_id uuid REFERENCES public.personnel(id) ON DELETE SET NULL,
     description text,
     status text DEFAULT 'completed'
