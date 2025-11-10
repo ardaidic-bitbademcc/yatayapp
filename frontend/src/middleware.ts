@@ -9,12 +9,13 @@ const PROTECTED_PATHS = [
   '/personnel',
   '/menu',
   '/pos',
-  '/finance'
+  '/finance',
+  '/settings'
 ];
 
 // Admin-only paths (isteğe bağlı genişletilebilir)
-const ADMIN_ONLY_PATHS = [
-  '/settings'
+const ADMIN_ONLY_PATHS: string[] = [
+  // '/settings' - şimdilik tüm authenticated kullanıcılara açık
 ];
 
 export async function middleware(req: NextRequest) {
