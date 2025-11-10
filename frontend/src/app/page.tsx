@@ -107,6 +107,9 @@ export default function HomePage() {
             </Button>
           </div>
         )}
+
+        {/* Modül Kartları */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <Link href="/pos">
             <div className="bg-white border-2 border-transparent hover:border-primary rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg">
               <div className="text-3xl mb-3">🛒</div>
@@ -166,6 +169,8 @@ export default function HomePage() {
             <Button size="sm" className="w-full" variant="ghost" disabled>Yakında</Button>
           </div>
         </div>
+
+        {/* Hızlı İstatistikler */}
         <div className="bg-white rounded-lg p-6 border">
           <h3 className="font-semibold mb-4">Hızlı İstatistikler</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
