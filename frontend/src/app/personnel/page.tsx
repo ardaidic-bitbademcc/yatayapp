@@ -12,8 +12,8 @@ export default function PersonnelPage() {
   const updateMutation = useUpdatePersonnel();
   const deleteMutation = useDeletePersonnel();
 
-  const [form, setForm] = useState({ name: '', role: '' });
-  const [editId, setEditId] = useState<number | null>(null);
+  const [form, setForm] = useState({ name: '', role: '', email: '', phone: '' });
+  const [editId, setEditId] = useState<string | null>(null);
 
   const error = fetchError?.message || createMutation.error?.message || updateMutation.error?.message || deleteMutation.error?.message;
   const formLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
@@ -30,15 +30,15 @@ export default function PersonnelPage() {
     } else {
       await createMutation.mutateAsync(form);
     }
-    setForm({ name: '', role: '' });
+  setForm({ name: '', role: '', email: '', phone: '' });
   };
 
   const handleEdit = (person: any) => {
-    setForm({ name: person.name, role: person.role });
+    setForm({ name: person.name, role: person.role, email: person.email || '', phone: person.phone || '' });
     setEditId(person.id);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     await deleteMutation.mutateAsync(id);
   };
 
@@ -64,6 +64,8 @@ export default function PersonnelPage() {
                   <div>
                     <span className="font-medium">{p.name}</span>
                     <span className="ml-2 text-xs text-muted-foreground">{p.role}</span>
+                    {p.email && <span className="ml-2 text-xs text-muted-foreground">| {p.email}</span>}
+                    {p.phone && <span className="ml-2 text-xs text-muted-foreground">| {p.phone}</span>}
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => handleEdit(p)}>Düzenle</Button>
@@ -85,10 +87,27 @@ export default function PersonnelPage() {
               disabled={formLoading}
             />
             <input
+              name="email"
+              type="email"
+              value={form.email}
+              onChange={handleChange}
+              placeholder="E-posta"
+              className="border rounded px-2 py-1 w-full"
+              disabled={formLoading}
+            />
+            <input
+              name="phone"
+              value={form.phone}
+              onChange={handleChange}
+              placeholder="Telefon"
+              className="border rounded px-2 py-1 w-full"
+              disabled={formLoading}
+            />
+            <input
               name="role"
               value={form.role}
               onChange={handleChange}
-              placeholder="Rol"
+              placeholder="Rol (ör: cashier, staff, chef)"
               className="border rounded px-2 py-1 w-full"
               required
               disabled={formLoading}
@@ -97,7 +116,7 @@ export default function PersonnelPage() {
               {editId ? 'Güncelle' : 'Ekle'}
             </Button>
             {editId && (
-              <Button type="button" size="sm" variant="ghost" className="w-full" onClick={() => { setEditId(null); setForm({ name: '', role: '' }); }}>
+              <Button type="button" size="sm" variant="ghost" className="w-full" onClick={() => { setEditId(null); setForm({ name: '', role: '', email: '', phone: '' }); }}>
                 İptal
               </Button>
             )}
