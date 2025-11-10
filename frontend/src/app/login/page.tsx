@@ -40,10 +40,11 @@ function LoginForm() {
       } else {
         setError(error.message);
       }
+      setLoading(false);
     } else if (data.session) {
-      router.push(redirect);
+      // Hard redirect ile cookie'lerin browser'da set olmasını sağla
+      window.location.href = redirect;
     }
-    setLoading(false);
   };
 
   return (
